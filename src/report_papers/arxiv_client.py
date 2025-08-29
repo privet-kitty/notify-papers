@@ -155,8 +155,7 @@ class ArxivClient:
         Returns:
             Deduplicated list of ArxivPaper objects
         """
-        all_papers = []
-        seen_ids = set()
+        papers_dict: dict[str, ArxivPaper] = {}
 
         for topic in topics:
             try:
@@ -167,18 +166,16 @@ class ArxivClient:
                     categories=categories,
                 )
 
-                # Deduplicate based on paper ID
+                # Use dict for automatic deduplication by paper ID
                 for paper in papers:
-                    if paper.id not in seen_ids:
-                        all_papers.append(paper)
-                        seen_ids.add(paper.id)
+                    papers_dict[paper.id] = paper
 
             except Exception as e:
                 logger.error(f"Error searching for topic '{topic}': {e}")
                 continue
 
         # Sort by publication date (newest first)
-        all_papers.sort(key=lambda p: p.published, reverse=True)
+        all_papers = sorted(papers_dict.values(), key=lambda p: p.published, reverse=True)
 
         logger.info(f"Found {len(all_papers)} unique papers across {len(topics)} topics")
         return all_papers

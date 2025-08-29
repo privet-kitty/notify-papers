@@ -58,6 +58,27 @@ class EmailNotifier:
             logger.warning(f"Failed to translate text to {self.target_language}: {e}")
             return text  # Return original text if translation fails
 
+    def _prepare_translated_papers(
+        self, relevant_papers: list[tuple[dict[str, Any], Any]]
+    ) -> list[tuple[dict[str, Any], Any, str]]:
+        """
+        Translate all abstracts once to avoid duplicate translation calls.
+
+        Args:
+            relevant_papers: List of (paper, relevance) tuples
+
+        Returns:
+            List of (paper, relevance, translated_abstract) tuples
+        """
+        translated_papers = []
+
+        for paper, relevance in relevant_papers:
+            abstract = paper.get("summary", "")
+            translated_abstract = self._translate_text(abstract)
+            translated_papers.append((paper, relevance, translated_abstract))
+
+        return translated_papers
+
     def send_paper_notification(
         self, relevant_papers: list[tuple[dict[str, Any], Any]], research_topics: list[str]
     ) -> bool:
@@ -76,10 +97,13 @@ class EmailNotifier:
             return True
 
         try:
+            # Translate all abstracts once before generating email content
+            papers_with_translated_abstracts = self._prepare_translated_papers(relevant_papers)
+
             # Generate email content
             subject = self._generate_subject(len(relevant_papers), research_topics)
-            html_body = self._generate_html_body(relevant_papers, research_topics)
-            text_body = self._generate_text_body(relevant_papers, research_topics)
+            html_body = self._generate_html_body(papers_with_translated_abstracts, research_topics)
+            text_body = self._generate_text_body(papers_with_translated_abstracts, research_topics)
 
             # Send email via SES
             response = self.ses_client.send_email(
@@ -173,7 +197,9 @@ Time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")}
         return f"Daily Paper News: {num_papers} New Papers - {topics_str}"
 
     def _generate_html_body(
-        self, relevant_papers: list[tuple[dict[str, Any], Any]], research_topics: list[str]
+        self,
+        papers_with_translations: list[tuple[dict[str, Any], Any, str]],
+        research_topics: list[str],
     ) -> str:
         """Generate HTML email body."""
         topics_str = ", ".join(research_topics)
@@ -211,10 +237,10 @@ Time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")}
             </div>
             
             <div class="content">
-                <p>Found {len(relevant_papers)} relevant papers from ArXiv:</p>
+                <p>Found {len(papers_with_translations)} relevant papers from ArXiv:</p>
         """
 
-        for paper, relevance in relevant_papers:
+        for paper, relevance, translated_abstract in papers_with_translations:
             # Determine score class
             score_class = "score-high" if relevance.relevance_score >= 0.8 else "score-medium"
 
@@ -226,9 +252,6 @@ Time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")}
             # Format categories
             categories_str = ", ".join(paper.get("categories", []))
 
-            # Translate abstract to target language
-            translated_summary = self._translate_text(paper.get("summary", ""))
-
             html += f"""
                 <div class="paper">
                     <div class="paper-title">
@@ -237,7 +260,7 @@ Time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")}
                         </a>
                     </div>
                     <div class="paper-authors">{authors_str}</div>
-                    <div class="paper-summary">{translated_summary}</div>
+                    <div class="paper-summary">{translated_abstract}</div>
                     <div class="paper-meta">
                         <span class="relevance-score {score_class}">
                             Relevance: {relevance.relevance_score:.1f}/1.0
@@ -263,7 +286,9 @@ Time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")}
         return html
 
     def _generate_text_body(
-        self, relevant_papers: list[tuple[dict[str, Any], Any]], research_topics: list[str]
+        self,
+        papers_with_translations: list[tuple[dict[str, Any], Any, str]],
+        research_topics: list[str],
     ) -> str:
         """Generate plain text email body."""
         topics_str = ", ".join(research_topics)
@@ -273,18 +298,15 @@ Time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")}
 NEW RELEVANT PAPERS - {date_str}
 
 Research Topics: {topics_str}
-Found {len(relevant_papers)} relevant papers from ArXiv:
+Found {len(papers_with_translations)} relevant papers from ArXiv:
 
 ========================================
 """
 
-        for i, (paper, relevance) in enumerate(relevant_papers, 1):
+        for i, (paper, relevance, translated_abstract) in enumerate(papers_with_translations, 1):
             authors_str = ", ".join(paper.get("authors", [])[:3])
             if len(paper.get("authors", [])) > 3:
                 authors_str += f" (+{len(paper['authors']) - 3} more)"
-
-            # Translate abstract to target language
-            translated_summary = self._translate_text(paper.get("summary", ""))
 
             text += f"""
 {i}. {paper.get("title", "Untitled")}
@@ -293,7 +315,7 @@ Authors: {authors_str}
 Relevance Score: {relevance.relevance_score:.1f}/1.0
 Key Topics: {", ".join(relevance.key_topics[:3])}
 
-Summary: {translated_summary}
+Summary: {translated_abstract}
 
 ArXiv Link: {paper.get("link", "N/A")}
 Published: {paper.get("published", "Unknown")[:10]}

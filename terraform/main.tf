@@ -168,14 +168,3 @@ resource "aws_lambda_permission" "allow_cloudwatch" {
 resource "aws_ses_email_identity" "sender" {
   email = var.email_recipient
 }
-
-# Outputs
-output "s3_papers_bucket" {
-  description = "S3 bucket name for duplicate detection"
-  value       = aws_s3_bucket.papers_bucket.bucket
-}
-
-output "lambda_function_name" {
-  description = "Lambda function name"
-  value       = aws_lambda_function.paper_agent.function_name
-}

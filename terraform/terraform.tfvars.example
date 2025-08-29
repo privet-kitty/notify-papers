@@ -1,0 +1,5 @@
+# Copy this file to terraform.tfvars and fill in your values
+aws_region = "us-east-1"
+project_name = "report-papers"
+email_recipient = "privet.kitty99@gmail.com"
+research_topics = ["energy market", "electricity market"]

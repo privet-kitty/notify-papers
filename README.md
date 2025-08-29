@@ -1,15 +1,18 @@
 # Paper notification agent
 
-This is an AWS-based system that automatically collects, evaluates, and notifies about the latest research papers related to specific research topics.
+This is an AWS-based system that automatically collects, evaluates, and notifies about the latest research papers related to specific research topics. Currently it only supports ArXiv as the paper source.
 
 ## Architecture
 
-```
-CloudWatch Events → Lambda Function → ArXiv API
-                         ↓
-                    Claude (Bedrock) → Email (SES)
-                         ↓
-                    S3 (State Management)
+```mermaid
+graph TD
+    CW[CloudWatch Events] --> LF[Lambda]
+    LF --> AX[ArXiv API<br/>Paper Search]
+    LF --> S3[S3 Bucket<br/>Duplicate Detection]
+    LF --> BR[Bedrock<br/>Claude Model<br/>Relevance Evaluation]
+    LF --> TR[Amazon Translate<br/>Summary Translation]
+    LF --> SES[Amazon SES<br/>Email Notification]
+    SES --> USER[📧 User Email]
 ```
 
 ## Deployment
@@ -18,9 +21,9 @@ CloudWatch Events → Lambda Function → ArXiv API
 
 Before deploying this system, ensure you have the following tools installed:
 
-- [uv](https://docs.astral.sh/uv/) - Python package and project manager
-- [Terraform](https://www.terraform.io/) - Infrastructure as Code tool
-- AWS CLI - Configured with appropriate credentials
+- [uv](https://docs.astral.sh/uv/)
+- [Terraform](https://www.terraform.io/)
+- [AWS CLI](https://aws.amazon.com/cli/)
 
 Before deploying this system, ensure you have the following prerequisites:
 
@@ -45,4 +48,4 @@ Before deploying this system, ensure you have the following prerequisites:
 
 ### Postrequisites
 
-After deployment, you'll need to verify your email address. Check your email inbox for a verification email from AWS SES
+After deployment, you'll need to verify your email address. Check your email inbox for a verification email from AWS SES.

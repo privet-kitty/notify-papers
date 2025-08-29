@@ -15,3 +15,4 @@ arxiv_categories = [
   "stat.AP",
   "eess.SY"
 ]
+llm_model = "anthropic.claude-3-sonnet-20240229-v1:0"

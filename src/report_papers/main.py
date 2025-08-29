@@ -34,17 +34,13 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         logger.info(f"Research topics: {config['research_topics']}")
 
         # Initialize clients
-        if not config["s3_bucket"]:
-            raise ValueError("S3_PAPERS_BUCKET environment variable is required")
         s3_storage = S3Storage(config["s3_bucket"])
         arxiv_client = ArxivClient()
-        llm_client = LLMClient(
-            model=config["llm_model"], region=config.get("aws_bedrock_region", "us-east-1")
-        )
+        llm_client = LLMClient(model=config["llm_model"], region=config["aws_bedrock_region"])
         email_notifier = EmailNotifier(
             config["email_recipient"],
             config["email_recipient"],
-            region=config.get("aws_bedrock_region", "us-east-1"),
+            region=config["aws_bedrock_region"],
             target_language=config["translate_target_language"],
         )
 
@@ -82,7 +78,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             papers=new_papers,
             research_topics=config["research_topics"],
             threshold=config["relevance_threshold"],
-            max_papers=config.get("max_papers_per_email", 10),
+            max_papers=config["max_papers_per_email"],
         )
 
         logger.info(f"Found {len(relevant_papers)} relevant papers")
@@ -137,8 +133,8 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             email_notifier = EmailNotifier(
                 config["email_recipient"],
                 config["email_recipient"],
-                region=config.get("aws_bedrock_region", "us-east-1"),
-                target_language=config.get("translate_target_language", "ja"),
+                region=config["aws_bedrock_region"],
+                target_language=config["translate_target_language"],
             )
             email_notifier.send_error_notification(error_msg)
         except Exception as email_error:

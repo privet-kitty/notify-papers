@@ -14,13 +14,7 @@ logger = get_logger(__name__)
 class EmailNotifier:
     """SES-based email notification system with translation support."""
 
-    def __init__(
-        self,
-        sender_email: str,
-        recipient_email: str,
-        region: str = "us-east-1",
-        target_language: str = "ja",
-    ):
+    def __init__(self, sender_email: str, recipient_email: str, region: str, target_language: str):
         self.sender_email = sender_email
         self.recipient_email = recipient_email
         self.target_language = target_language

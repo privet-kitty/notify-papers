@@ -4,18 +4,18 @@ import os
 from typing import TypedDict
 
 
-class AgentConfig(TypedDict, total=False):
+class AgentConfig(TypedDict, total=True):
     """Configuration for the paper collection agent.
 
     This TypedDict defines the structure of the configuration dictionary
-    used throughout the application.
+    used throughout the application. All fields are required.
     """
 
-    # Required fields
+    # Required fields from environment
     email_recipient: str
+    s3_bucket: str
 
-    # Optional fields with defaults
-    s3_bucket: str | None
+    # Required fields with defaults
     research_topics: list[str]
     llm_model: str
     aws_bedrock_region: str
@@ -28,16 +28,31 @@ class AgentConfig(TypedDict, total=False):
     arxiv_categories: list[str]
 
 
-def get_default_config() -> AgentConfig:
+def get_environment_config() -> AgentConfig:
     """
-    Get default configuration values.
+    Get configuration from environment variables with required validation.
 
     Returns:
-        AgentConfig: Configuration dictionary with default values
+        AgentConfig: Configuration dictionary with all required fields populated
+
+    Raises:
+        ValueError: If required environment variables are not set
     """
+    # Validate required environment variables
+    email_recipient = os.environ.get("EMAIL_RECIPIENT")
+    if not email_recipient:
+        raise ValueError("EMAIL_RECIPIENT environment variable is required")
+
+    s3_bucket = os.environ.get("S3_PAPERS_BUCKET")
+    if not s3_bucket:
+        raise ValueError("S3_PAPERS_BUCKET environment variable is required")
+
+    # Build config with defaults and environment overrides
     config: AgentConfig = {
-        "s3_bucket": None,
-        "email_recipient": "",
+        # Required fields from environment
+        "email_recipient": email_recipient,
+        "s3_bucket": s3_bucket,
+        # Fields with defaults that can be overridden
         "research_topics": [
             "electricity market",
             "energy market",
@@ -49,7 +64,7 @@ def get_default_config() -> AgentConfig:
         "relevance_threshold": 0.7,
         "min_relevance_score": 0.5,
         "max_papers_per_email": 15,
-        "translate_target_language": "ja",
+        "translate_target_language": "en",
         "arxiv_categories": [
             "econ.EM",
             "econ.GN",
@@ -63,26 +78,7 @@ def get_default_config() -> AgentConfig:
         ],
     }
 
-    return config
-
-
-def get_environment_config() -> AgentConfig:
-    """
-    Get configuration from environment variables, using defaults as base.
-
-    Returns:
-        AgentConfig: Configuration dictionary with environment overrides
-    """
-    # Start with default configuration
-    config = get_default_config()
-
     # Override with environment variables if they exist
-    if s3_bucket := os.environ.get("S3_PAPERS_BUCKET"):
-        config["s3_bucket"] = s3_bucket
-
-    if email_recipient := os.environ.get("EMAIL_RECIPIENT"):
-        config["email_recipient"] = email_recipient
-
     if research_topics_env := os.environ.get("RESEARCH_TOPICS"):
         research_topics = [topic.strip() for topic in research_topics_env.split(",")]
         config["research_topics"] = research_topics

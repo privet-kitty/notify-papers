@@ -24,9 +24,7 @@ class PaperRelevance(BaseModel):
 class LLMClient:
     """Client for LLM-based paper evaluation using Amazon Bedrock."""
 
-    def __init__(
-        self, model: str = "anthropic.claude-3-haiku-20240307-v1:0", region: str = "us-east-1"
-    ):
+    def __init__(self, model: str, region: str):
         self.model = model
         self.bedrock_runtime = boto3.client("bedrock-runtime", region_name=region)
 

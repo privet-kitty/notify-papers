@@ -90,9 +90,7 @@ resource "aws_iam_role_policy" "lambda_policy" {
           "bedrock:InvokeModel"
         ]
         Resource = [
-          "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-haiku-20240307-v1:0",
-          "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0",
-          "arn:aws:bedrock:*::foundation-model/anthropic.claude-v2*"
+          "arn:aws:bedrock:*::foundation-model/${var.llm_model}"
         ]
       },
       {
@@ -122,7 +120,7 @@ resource "aws_lambda_function" "paper_agent" {
       S3_PAPERS_BUCKET = aws_s3_bucket.papers_bucket.bucket
       EMAIL_RECIPIENT  = var.email_recipient
       RESEARCH_TOPICS  = join(",", var.research_topics)
-      LLM_MODEL        = "anthropic.claude-3-haiku-20240307-v1:0"
+      LLM_MODEL        = var.llm_model
       AWS_BEDROCK_REGION = var.aws_region
       TRANSLATE_TARGET_LANGUAGE = var.translate_target_language
       ARXIV_CATEGORIES = join(",", var.arxiv_categories)

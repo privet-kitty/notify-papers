@@ -1,4 +1,4 @@
-# Paper notification agent
+# notify-papers
 
 This is an AWS-based system that automatically collects, evaluates, and notifies about the latest research papers related to specific research topics. Currently it only supports ArXiv as the paper source.
 
@@ -12,7 +12,7 @@ graph TD
     LF --> BR[Bedrock<br/>Claude Model<br/>Relevance Evaluation]
     LF --> TR[Amazon Translate<br/>Summary Translation]
     LF --> SES[Amazon SES<br/>Email Notification]
-    SES --> USER[📧 User Email]
+    SES --> USER[User Email]
 ```
 
 ## Deployment
@@ -25,9 +25,9 @@ Before deploying this system, ensure you have the following tools installed:
 - [Terraform](https://www.terraform.io/)
 - [AWS CLI](https://aws.amazon.com/cli/)
 
-Before deploying this system, ensure you have the following prerequisites:
+Also, ensure you have the following prerequisites:
 
-- Enable Claude models in Amazon Bedrock before deployment. Please go to the [Amazon Bedrock Console](https://console.aws.amazon.com/bedrock/) and enable access to Claude models.
+- Enable Claude models in Amazon Bedrock before deployment. Please go to your [Amazon Bedrock Console](https://console.aws.amazon.com/bedrock/) and enable access to Claude models. The default model used is `anthropic.claude-3-haiku-20240307-v1:0`.
 - Copy the example configuration file and customize it:
   ```bash
   cp terraform/terraform.tfvars.example terraform/terraform.tfvars

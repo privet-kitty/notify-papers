@@ -32,3 +32,9 @@ variable "arxiv_categories" {
   description = "ArXiv categories to search within (e.g., ['econ.EM', 'cs.LG'])"
   type        = list(string)
 }
+
+variable "llm_model" {
+  description = "Amazon Bedrock LLM model to use for paper evaluation"
+  type        = string
+  default     = "anthropic.claude-3-haiku-20240307-v1:0"
+}

@@ -19,11 +19,16 @@ rm -f lambda-deployment-package.zip
 
 # Use uv to create a clean environment and package
 uv build
-mkdir -p build/lambda
-cd build/lambda
 
-# Install dependencies
-python3.12 -m pip install ../../dist/*.whl -t .
+# Export dependencies to requirements.txt from project root
+mkdir -p build/lambda
+uv export --format requirements-txt --no-dev > build/requirements.txt
+
+# Install dependencies from project root using absolute target path
+uv pip install -r build/requirements.txt --target build/lambda
+uv pip install dist/*.whl --target build/lambda --no-deps
+
+cd build/lambda
 
 # Add source code
 cp -r ../../src ./

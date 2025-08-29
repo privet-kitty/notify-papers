@@ -1,56 +1,18 @@
-terraform {
-  required_version = ">= 1.5"
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
+
+# S3 Bucket for duplicate detection
+resource "aws_s3_bucket" "papers_bucket" {
+  bucket = "${var.project_name}-papers-${random_id.bucket_suffix.hex}"
 }
 
-provider "aws" {
-  region = var.aws_region
-}
-
-# Variables
-variable "aws_region" {
-  description = "AWS region"
-  type        = string
-  default     = "us-east-1"
-}
-
-variable "project_name" {
-  description = "Project name"
-  type        = string
-  default     = "report-papers"
-}
-
-variable "email_recipient" {
-  description = "Email recipient for notifications"
-  type        = string
-}
-
-
-variable "research_topics" {
-  description = "Research topics to search for"
-  type        = list(string)
-  default     = ["energy market", "electricity market"]
-}
-
-# S3 Bucket for configuration and state
-resource "aws_s3_bucket" "config_bucket" {
-  bucket = "${var.project_name}-config-${random_id.bucket_suffix.hex}"
-}
-
-resource "aws_s3_bucket_versioning" "config_bucket_versioning" {
-  bucket = aws_s3_bucket.config_bucket.id
+resource "aws_s3_bucket_versioning" "papers_bucket_versioning" {
+  bucket = aws_s3_bucket.papers_bucket.id
   versioning_configuration {
     status = "Enabled"
   }
 }
 
-resource "aws_s3_bucket_server_side_encryption_configuration" "config_bucket_encryption" {
-  bucket = aws_s3_bucket.config_bucket.id
+resource "aws_s3_bucket_server_side_encryption_configuration" "papers_bucket_encryption" {
+  bucket = aws_s3_bucket.papers_bucket.id
 
   rule {
     apply_server_side_encryption_by_default {
@@ -105,14 +67,14 @@ resource "aws_iam_role_policy" "lambda_policy" {
           "s3:PutObject",
           "s3:DeleteObject"
         ]
-        Resource = "${aws_s3_bucket.config_bucket.arn}/*"
+        Resource = "${aws_s3_bucket.papers_bucket.arn}/*"
       },
       {
         Effect = "Allow"
         Action = [
           "s3:ListBucket"
         ]
-        Resource = "${aws_s3_bucket.config_bucket.arn}"
+        Resource = "${aws_s3_bucket.papers_bucket.arn}"
       },
       {
         Effect = "Allow"
@@ -157,11 +119,13 @@ resource "aws_lambda_function" "paper_agent" {
 
   environment {
     variables = {
-      S3_CONFIG_BUCKET = aws_s3_bucket.config_bucket.bucket
+      S3_PAPERS_BUCKET = aws_s3_bucket.papers_bucket.bucket
       EMAIL_RECIPIENT  = var.email_recipient
       RESEARCH_TOPICS  = join(",", var.research_topics)
       LLM_MODEL        = "anthropic.claude-3-haiku-20240307-v1:0"
       AWS_BEDROCK_REGION = var.aws_region
+      TRANSLATE_TARGET_LANGUAGE = var.translate_target_language
+      ARXIV_CATEGORIES = join(",", var.arxiv_categories)
     }
   }
 
@@ -206,9 +170,9 @@ resource "aws_ses_email_identity" "sender" {
 }
 
 # Outputs
-output "s3_config_bucket" {
-  description = "S3 bucket name for configuration"
-  value       = aws_s3_bucket.config_bucket.bucket
+output "s3_papers_bucket" {
+  description = "S3 bucket name for duplicate detection"
+  value       = aws_s3_bucket.papers_bucket.bucket
 }
 
 output "lambda_function_name" {

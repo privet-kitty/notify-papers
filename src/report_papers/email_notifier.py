@@ -1,11 +1,10 @@
 """SES-based email notification system for paper alerts."""
 
+from datetime import datetime
+from typing import Any
+
 import boto3
 from botocore.exceptions import ClientError
-from typing import List, Dict, Any, Tuple
-from datetime import datetime
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 
 from .logger import get_logger
 
@@ -14,112 +13,110 @@ logger = get_logger(__name__)
 
 class EmailNotifier:
     """SES-based email notification system with translation support."""
-    
-    def __init__(self, sender_email: str, recipient_email: str, region: str = 'us-east-1'):
+
+    def __init__(
+        self,
+        sender_email: str,
+        recipient_email: str,
+        region: str = "us-east-1",
+        target_language: str = "ja",
+    ):
         self.sender_email = sender_email
         self.recipient_email = recipient_email
-        self.ses_client = boto3.client('ses', region_name=region)
-        self.translate_client = boto3.client('translate', region_name=region)
-    
-    def _translate_to_japanese(self, text: str) -> str:
+        self.target_language = target_language
+        self.ses_client = boto3.client("ses", region_name=region)
+        self.translate_client = boto3.client("translate", region_name=region)
+
+    def _translate_text(self, text: str) -> str:
         """
-        Translate text to Japanese using Amazon Translate.
-        
+        Translate text to the target language using Amazon Translate.
+
         Args:
             text: Text to translate
-            
+
         Returns:
-            Translated text in Japanese, or original text if translation fails
+            Translated text in target language, or original text if translation fails or target is 'en'
         """
         if not text or not text.strip():
             return text
-            
+
+        # Skip translation if target language is English
+        if self.target_language == "en":
+            return text
+
         try:
             response = self.translate_client.translate_text(
-                Text=text,
-                SourceLanguageCode='en',
-                TargetLanguageCode='ja'
+                Text=text, SourceLanguageCode="en", TargetLanguageCode=self.target_language
             )
-            translated_text = response['TranslatedText']
-            logger.info(f"Successfully translated text: {len(text)} chars -> {len(translated_text)} chars")
-            return translated_text
-            
+            translated_text = response["TranslatedText"]
+            logger.info(
+                f"Successfully translated text to {self.target_language}: {len(text)} chars -> {len(translated_text)} chars"
+            )
+            return str(translated_text)
+
         except Exception as e:
-            logger.warning(f"Failed to translate text: {e}")
+            logger.warning(f"Failed to translate text to {self.target_language}: {e}")
             return text  # Return original text if translation fails
-    
+
     def send_paper_notification(
-        self, 
-        relevant_papers: List[Tuple[Dict[str, Any], Any]],
-        research_topics: List[str]
+        self, relevant_papers: list[tuple[dict[str, Any], Any]], research_topics: list[str]
     ) -> bool:
         """
         Send email notification with relevant papers.
-        
+
         Args:
             relevant_papers: List of (paper, relevance) tuples
             research_topics: List of research topics
-            
+
         Returns:
             True if email sent successfully, False otherwise
         """
         if not relevant_papers:
             logger.info("No relevant papers to send")
             return True
-        
+
         try:
             # Generate email content
             subject = self._generate_subject(len(relevant_papers), research_topics)
             html_body = self._generate_html_body(relevant_papers, research_topics)
             text_body = self._generate_text_body(relevant_papers, research_topics)
-            
+
             # Send email via SES
             response = self.ses_client.send_email(
                 Source=self.sender_email,
-                Destination={
-                    'ToAddresses': [self.recipient_email]
-                },
+                Destination={"ToAddresses": [self.recipient_email]},
                 Message={
-                    'Subject': {
-                        'Data': subject,
-                        'Charset': 'UTF-8'
+                    "Subject": {"Data": subject, "Charset": "UTF-8"},
+                    "Body": {
+                        "Text": {"Data": text_body, "Charset": "UTF-8"},
+                        "Html": {"Data": html_body, "Charset": "UTF-8"},
                     },
-                    'Body': {
-                        'Text': {
-                            'Data': text_body,
-                            'Charset': 'UTF-8'
-                        },
-                        'Html': {
-                            'Data': html_body,
-                            'Charset': 'UTF-8'
-                        }
-                    }
-                }
+                },
             )
-            
+
             logger.info(f"Email sent successfully. MessageId: {response['MessageId']}")
             return True
-            
+
         except ClientError as e:
-            error_code = e.response['Error']['Code']
+            error_code = e.response["Error"]["Code"]
             logger.error(f"SES ClientError: {error_code} - {e.response['Error']['Message']}")
             return False
         except Exception as e:
             logger.error(f"Unexpected error sending email: {e}")
             return False
-    
+
     def send_error_notification(self, error_message: str) -> bool:
         """
         Send error notification email.
-        
+
         Args:
             error_message: Error message to include in email
-            
+
         Returns:
             True if email sent successfully, False otherwise
         """
         subject = "Report Papers Agent - Error Notification"
-        
+
         html_body = f"""
         <html>
         <head></head>
@@ -130,11 +127,11 @@ class EmailNotifier:
                 <pre>{error_message}</pre>
             </div>
             <p>Please check the CloudWatch logs for more details.</p>
-            <p><em>Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}</em></p>
+            <p><em>Time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")}</em></p>
         </body>
         </html>
         """
-        
+
         text_body = f"""
 Report Papers Agent - Error
 
@@ -144,46 +141,44 @@ The paper collection agent encountered an error during its last run:
 
 Please check the CloudWatch logs for more details.
 
-Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
+Time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")}
         """
-        
+
         try:
             response = self.ses_client.send_email(
                 Source=self.sender_email,
-                Destination={'ToAddresses': [self.recipient_email]},
+                Destination={"ToAddresses": [self.recipient_email]},
                 Message={
-                    'Subject': {'Data': subject, 'Charset': 'UTF-8'},
-                    'Body': {
-                        'Text': {'Data': text_body, 'Charset': 'UTF-8'},
-                        'Html': {'Data': html_body, 'Charset': 'UTF-8'}
-                    }
-                }
+                    "Subject": {"Data": subject, "Charset": "UTF-8"},
+                    "Body": {
+                        "Text": {"Data": text_body, "Charset": "UTF-8"},
+                        "Html": {"Data": html_body, "Charset": "UTF-8"},
+                    },
+                },
             )
-            
+
             logger.info(f"Error notification sent. MessageId: {response['MessageId']}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to send error notification: {e}")
             return False
-    
-    def _generate_subject(self, num_papers: int, research_topics: List[str]) -> str:
+
+    def _generate_subject(self, num_papers: int, research_topics: list[str]) -> str:
         """Generate email subject line."""
         topics_str = ", ".join(research_topics[:2])
         if len(research_topics) > 2:
             topics_str += f" (+{len(research_topics) - 2} more)"
-        
+
         return f"📚 {num_papers} New Relevant Papers - {topics_str}"
-    
+
     def _generate_html_body(
-        self, 
-        relevant_papers: List[Tuple[Dict[str, Any], Any]], 
-        research_topics: List[str]
+        self, relevant_papers: list[tuple[dict[str, Any], Any]], research_topics: list[str]
     ) -> str:
         """Generate HTML email body."""
         topics_str = ", ".join(research_topics)
-        date_str = datetime.now().strftime('%Y-%m-%d')
-        
+        date_str = datetime.now().strftime("%Y-%m-%d")
+
         html = f"""
         <html>
         <head>
@@ -218,27 +213,27 @@ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
             <div class="content">
                 <p>Found {len(relevant_papers)} relevant papers from ArXiv:</p>
         """
-        
+
         for paper, relevance in relevant_papers:
             # Determine score class
             score_class = "score-high" if relevance.relevance_score >= 0.8 else "score-medium"
-            
+
             # Format authors
-            authors_str = ", ".join(paper.get('authors', [])[:3])
-            if len(paper.get('authors', [])) > 3:
+            authors_str = ", ".join(paper.get("authors", [])[:3])
+            if len(paper.get("authors", [])) > 3:
                 authors_str += f" (+{len(paper['authors']) - 3} more)"
-            
+
             # Format categories
-            categories_str = ", ".join(paper.get('categories', []))
-            
-            # Translate summary to Japanese
-            translated_summary = self._translate_to_japanese(relevance.summary)
-            
+            categories_str = ", ".join(paper.get("categories", []))
+
+            # Translate summary to target language
+            translated_summary = self._translate_text(relevance.summary)
+
             html += f"""
                 <div class="paper">
                     <div class="paper-title">
-                        <a href="{paper.get('link', '#')}" style="color: #1976d2; text-decoration: none;">
-                            {paper.get('title', 'Untitled')}
+                        <a href="{paper.get("link", "#")}" style="color: #1976d2; text-decoration: none;">
+                            {paper.get("title", "Untitled")}
                         </a>
                     </div>
                     <div class="paper-authors">{authors_str}</div>
@@ -248,34 +243,32 @@ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
                             Relevance: {relevance.relevance_score:.1f}/1.0
                         </span>
                         | Categories: {categories_str}
-                        | Published: {paper.get('published', 'Unknown')[:10]}
-                        | Topics: {', '.join(relevance.key_topics[:3])}
+                        | Published: {paper.get("published", "Unknown")[:10]}
+                        | Topics: {", ".join(relevance.key_topics[:3])}
                     </div>
                 </div>
             """
-        
+
         html += f"""
             </div>
             
             <div class="footer">
                 <p>Generated by Report Papers AI Agent</p>
-                <p><em>{datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}</em></p>
+                <p><em>{datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")}</em></p>
             </div>
         </body>
         </html>
         """
-        
+
         return html
-    
+
     def _generate_text_body(
-        self, 
-        relevant_papers: List[Tuple[Dict[str, Any], Any]], 
-        research_topics: List[str]
+        self, relevant_papers: list[tuple[dict[str, Any], Any]], research_topics: list[str]
     ) -> str:
         """Generate plain text email body."""
         topics_str = ", ".join(research_topics)
-        date_str = datetime.now().strftime('%Y-%m-%d')
-        
+        date_str = datetime.now().strftime("%Y-%m-%d")
+
         text = f"""
 NEW RELEVANT PAPERS - {date_str}
 
@@ -284,48 +277,48 @@ Found {len(relevant_papers)} relevant papers from ArXiv:
 
 ========================================
 """
-        
+
         for i, (paper, relevance) in enumerate(relevant_papers, 1):
-            authors_str = ", ".join(paper.get('authors', [])[:3])
-            if len(paper.get('authors', [])) > 3:
+            authors_str = ", ".join(paper.get("authors", [])[:3])
+            if len(paper.get("authors", [])) > 3:
                 authors_str += f" (+{len(paper['authors']) - 3} more)"
-            
-            # Translate summary to Japanese
-            translated_summary = self._translate_to_japanese(relevance.summary)
-            
+
+            # Translate summary to target language
+            translated_summary = self._translate_text(relevance.summary)
+
             text += f"""
-{i}. {paper.get('title', 'Untitled')}
+{i}. {paper.get("title", "Untitled")}
 
 Authors: {authors_str}
 Relevance Score: {relevance.relevance_score:.1f}/1.0
-Key Topics: {', '.join(relevance.key_topics[:3])}
+Key Topics: {", ".join(relevance.key_topics[:3])}
 
 Summary: {translated_summary}
 
-ArXiv Link: {paper.get('link', 'N/A')}
-Published: {paper.get('published', 'Unknown')[:10]}
-Categories: {', '.join(paper.get('categories', []))}
+ArXiv Link: {paper.get("link", "N/A")}
+Published: {paper.get("published", "Unknown")[:10]}
+Categories: {", ".join(paper.get("categories", []))}
 
 ----------------------------------------
 """
-        
+
         text += f"""
 
 Generated by Report Papers AI Agent
-{datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
+{datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")}
         """
-        
+
         return text.strip()
-    
+
     def test_email_configuration(self) -> bool:
         """
         Test email configuration by sending a test email.
-        
+
         Returns:
             True if test email sent successfully, False otherwise
         """
         subject = "Report Papers Agent - Test Email"
-        
+
         html_body = """
         <html>
         <body>
@@ -335,7 +328,7 @@ Generated by Report Papers AI Agent
         </body>
         </html>
         """
-        
+
         text_body = """
 Test Email from Report Papers Agent
 
@@ -343,23 +336,23 @@ This is a test email to verify that the SES configuration is working correctly.
 
 If you received this email, the setup is successful!
         """
-        
+
         try:
             response = self.ses_client.send_email(
                 Source=self.sender_email,
-                Destination={'ToAddresses': [self.recipient_email]},
+                Destination={"ToAddresses": [self.recipient_email]},
                 Message={
-                    'Subject': {'Data': subject, 'Charset': 'UTF-8'},
-                    'Body': {
-                        'Text': {'Data': text_body, 'Charset': 'UTF-8'},
-                        'Html': {'Data': html_body, 'Charset': 'UTF-8'}
-                    }
-                }
+                    "Subject": {"Data": subject, "Charset": "UTF-8"},
+                    "Body": {
+                        "Text": {"Data": text_body, "Charset": "UTF-8"},
+                        "Html": {"Data": html_body, "Charset": "UTF-8"},
+                    },
+                },
             )
-            
+
             logger.info(f"Test email sent successfully. MessageId: {response['MessageId']}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to send test email: {e}")
             return False

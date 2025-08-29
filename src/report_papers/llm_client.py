@@ -18,7 +18,6 @@ class PaperRelevance(BaseModel):
     relevance_score: float  # 0.0 to 1.0
     relevance_reason: str
     key_topics: list[str]
-    summary: str
     is_relevant: bool
 
 
@@ -86,7 +85,6 @@ class LLMClient:
                 relevance_score=0.1,
                 relevance_reason="Error during evaluation",
                 key_topics=[],
-                summary="Evaluation failed",
                 is_relevant=False,
             )
 
@@ -110,7 +108,6 @@ Please evaluate this paper's relevance to the research topics and provide your a
     "relevance_score": <float between 0.0 and 1.0>,
     "relevance_reason": "<explanation of why this score was assigned>",
     "key_topics": ["<topic1>", "<topic2>", ...],
-    "summary": "<concise 4-5 sentence summary of the paper's main contribution>",
     "is_highly_relevant": <true/false for scores >= 0.7>
 }}
 
@@ -190,7 +187,6 @@ Respond only with the JSON object, no additional text.
                 relevance_score=relevance_score,
                 relevance_reason=data.get("relevance_reason", ""),
                 key_topics=data.get("key_topics", []),
-                summary=data.get("summary", ""),
                 is_relevant=is_relevant,
             )
 
@@ -209,7 +205,6 @@ Respond only with the JSON object, no additional text.
                 relevance_score=score,
                 relevance_reason="Parsing error - fallback evaluation",
                 key_topics=[],
-                summary="Could not parse summary",
                 is_relevant=score >= threshold,
             )
 

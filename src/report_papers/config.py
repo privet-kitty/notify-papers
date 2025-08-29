@@ -44,11 +44,11 @@ def get_default_config() -> AgentConfig:
         ],
         "llm_model": "anthropic.claude-3-haiku-20240307-v1:0",
         "aws_bedrock_region": "us-east-1",
-        "max_results_per_topic": 20,
+        "max_results_per_topic": 40,
         "days_back": 3,
         "relevance_threshold": 0.7,
         "min_relevance_score": 0.5,
-        "max_papers_per_email": 10,
+        "max_papers_per_email": 15,
         "translate_target_language": "ja",
         "arxiv_categories": [
             "econ.EM",

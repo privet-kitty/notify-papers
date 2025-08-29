@@ -170,7 +170,7 @@ Time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")}
         if len(research_topics) > 2:
             topics_str += f" (+{len(research_topics) - 2} more)"
 
-        return f"📚 {num_papers} New Relevant Papers - {topics_str}"
+        return f"Daily Paper News: {num_papers} New Papers - {topics_str}"
 
     def _generate_html_body(
         self, relevant_papers: list[tuple[dict[str, Any], Any]], research_topics: list[str]
@@ -226,8 +226,8 @@ Time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")}
             # Format categories
             categories_str = ", ".join(paper.get("categories", []))
 
-            # Translate summary to target language
-            translated_summary = self._translate_text(relevance.summary)
+            # Translate abstract to target language
+            translated_summary = self._translate_text(paper.get("summary", ""))
 
             html += f"""
                 <div class="paper">
@@ -283,8 +283,8 @@ Found {len(relevant_papers)} relevant papers from ArXiv:
             if len(paper.get("authors", [])) > 3:
                 authors_str += f" (+{len(paper['authors']) - 3} more)"
 
-            # Translate summary to target language
-            translated_summary = self._translate_text(relevance.summary)
+            # Translate abstract to target language
+            translated_summary = self._translate_text(paper.get("summary", ""))
 
             text += f"""
 {i}. {paper.get("title", "Untitled")}

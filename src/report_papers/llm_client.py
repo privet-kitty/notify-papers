@@ -116,7 +116,7 @@ Scoring Guidelines:
 - 0.3-0.4: Weak relevance, tangential connection
 - 0.0-0.2: Little to no relevance
 
-Focus on: energy markets, electricity markets, power systems economics, renewable energy integration, market design, pricing mechanisms, grid economics.
+Focus specifically on the research topics provided above: {topics_str}
 
 Respond only with the JSON object, no additional text.
 """

@@ -38,11 +38,7 @@ class ArxivClient:
         )
 
     def search_papers(
-        self,
-        query: str,
-        max_results: int,
-        days_back: int,
-        categories: list[str] | None = None,
+        self, query: str, max_results: int, days_back: int, categories: list[str]
     ) -> list[Paper]:
         """
         Search for papers on ArXiv.
@@ -98,9 +94,7 @@ class ArxivClient:
             logger.error(f"Unexpected error in ArXiv search: {e}")
             raise
 
-    def _build_search_query(
-        self, query: str, days_back: int, categories: list[str] | None = None
-    ) -> str:
+    def _build_search_query(self, query: str, days_back: int, categories: list[str]) -> str:
         """Build ArXiv search query string."""
         # Date range
         end_date = datetime.now()
@@ -112,15 +106,8 @@ class ArxivClient:
         query_parts = [f"({query})", f"submittedDate:{date_range}"]
 
         # Add category filter if specified
-        if categories:
-            category_query = " OR ".join([f"cat:{cat}" for cat in categories])
-            query_parts.append(f"({category_query})")
-
-        # Common categories for energy/electricity market research
-        default_categories = ["econ.GN", "physics.soc-ph", "cs.CE", "math.OC"]
-        if not categories:
-            category_query = " OR ".join([f"cat:{cat}" for cat in default_categories])
-            query_parts.append(f"({category_query})")
+        category_query = " OR ".join([f"cat:{cat}" for cat in categories])
+        query_parts.append(f"({category_query})")
 
         return " AND ".join(query_parts)
 
@@ -129,7 +116,7 @@ class ArxivClient:
         topics: list[str],
         max_results_per_topic: int,
         days_back: int,
-        categories: list[str] | None = None,
+        categories: list[str],
     ) -> list[Paper]:
         """
         Search for papers across multiple topics and deduplicate.

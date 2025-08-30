@@ -1,9 +1,9 @@
 # Copy this file to terraform.tfvars and fill in your values
 aws_region = "us-east-1"
 project_name = "report-papers"
-email_recipient = "foo@example.com"
+email_recipient = "hugo@example.com"
 translate_target_language = "en"
-research_topics = ["energy market", "electricity market"]
+research_topics = ["algorithmic game theory", "discrete convex analysis"]
 arxiv_categories = [
   "econ.EM",
   "econ.GN", 

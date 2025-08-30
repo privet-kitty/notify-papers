@@ -5,37 +5,38 @@ from typing import Any
 
 import feedparser
 import requests
+from pydantic import BaseModel
 
 from .logger import get_logger
 
 logger = get_logger(__name__)
 
 
-class ArxivPaper:
+class ArxivPaper(BaseModel):
     """Represents a paper from ArXiv."""
 
-    def __init__(self, entry: dict[str, Any]):
-        self.id = entry.get("id", "").split("/")[-1]
-        self.title = entry.get("title", "").strip()
-        self.summary = entry.get("summary", "").strip().replace("\n", " ")
-        self.authors = [author.get("name", "") for author in entry.get("authors", [])]
-        self.published = entry.get("published", "")
-        self.updated = entry.get("updated", "")
-        self.link = entry.get("link", "")
-        self.categories = [tag.get("term", "") for tag in entry.get("tags", [])]
+    id: str
+    title: str
+    summary: str
+    authors: list[str]
+    published: str
+    updated: str
+    link: str
+    categories: list[str]
 
-    def to_dict(self) -> dict[str, Any]:
-        """Convert paper to dictionary."""
-        return {
-            "id": self.id,
-            "title": self.title,
-            "summary": self.summary,
-            "authors": self.authors,
-            "published": self.published,
-            "updated": self.updated,
-            "link": self.link,
-            "categories": self.categories,
-        }
+    @classmethod
+    def from_entry(cls, entry: dict[str, Any]) -> "ArxivPaper":
+        """Parse ArXiv API entry into ArxivPaper instance."""
+        return cls(
+            id=entry.get("id", "").split("/")[-1],
+            title=entry.get("title", "").strip(),
+            summary=entry.get("summary", "").strip().replace("\n", " "),
+            authors=[author.get("name", "") for author in entry.get("authors", [])],
+            published=entry.get("published", ""),
+            updated=entry.get("updated", ""),
+            link=entry.get("link", ""),
+            categories=[tag.get("term", "") for tag in entry.get("tags", [])],
+        )
 
 
 class ArxivClient:
@@ -94,7 +95,7 @@ class ArxivClient:
             papers = []
             for entry in feed.entries:
                 try:
-                    paper = ArxivPaper(entry)
+                    paper = ArxivPaper.from_entry(entry)
                     papers.append(paper)
                 except Exception as e:
                     logger.error(f"Error parsing paper entry: {e}")

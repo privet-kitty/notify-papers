@@ -62,7 +62,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         logger.info(f"Found {len(papers)} total papers")
 
         # Convert papers to dictionaries for processing
-        paper_dicts = [paper.to_dict() for paper in papers]
+        paper_dicts = [paper.model_dump() for paper in papers]
 
         # Filter out already seen papers
         new_papers = s3_storage.filter_new_papers(paper_dicts)

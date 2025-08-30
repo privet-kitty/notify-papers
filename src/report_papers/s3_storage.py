@@ -3,9 +3,9 @@
 import json
 import boto3
 from datetime import datetime, timedelta
-from typing import Any
 from botocore.exceptions import ClientError
 
+from .interface import Paper
 from .logger import get_logger
 
 logger = get_logger(__name__)
@@ -115,18 +115,18 @@ class S3Storage:
         # Save updated list
         return self.save_seen_papers(updated_papers)
 
-    def filter_new_papers(self, papers: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def filter_new_papers(self, papers: list[Paper]) -> list[Paper]:
         """
         Filter out papers that have been seen before.
 
         Args:
-            papers: List of paper dictionaries with 'id' field
+            papers: List of Paper objects
 
         Returns:
             List of new (unseen) papers
         """
         seen_papers = self.load_seen_papers()
-        new_papers = [paper for paper in papers if paper.get("id") not in seen_papers]
+        new_papers = [paper for paper in papers if paper.id not in seen_papers]
 
         logger.info(f"Filtered {len(papers)} papers -> {len(new_papers)} new papers")
         return new_papers

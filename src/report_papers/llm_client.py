@@ -1,12 +1,12 @@
 """LLM client for paper relevance evaluation and summarization using Amazon Bedrock."""
 
 import json
-from typing import Any
 
 import boto3
 from botocore.exceptions import ClientError
 from pydantic import BaseModel
 
+from .interface import Paper
 from .logger import get_logger
 
 logger = get_logger(__name__)
@@ -48,13 +48,13 @@ class LLMClient:
         return "claude-3" in self.model
 
     def evaluate_paper_relevance(
-        self, paper: dict[str, Any], research_topics: list[str], threshold: float
+        self, paper: Paper, research_topics: list[str], threshold: float
     ) -> PaperRelevance:
         """
         Evaluate how relevant a paper is to the research topics.
 
         Args:
-            paper: Paper dictionary with 'title', 'summary', 'categories'
+            paper: Paper object with title, summary, categories
             research_topics: List of research topics of interest
             threshold: Minimum relevance score to consider relevant
 
@@ -69,7 +69,7 @@ class LLMClient:
             # Parse the result
             relevance = self._parse_evaluation_result(result, threshold)
             logger.info(
-                f"Evaluated paper {paper.get('id', 'unknown')}: "
+                f"Evaluated paper {paper.id}: "
                 f"score={relevance.relevance_score:.2f}, "
                 f"relevant={relevance.is_relevant}"
             )
@@ -86,7 +86,7 @@ class LLMClient:
                 is_relevant=False,
             )
 
-    def _create_evaluation_prompt(self, paper: dict[str, Any], research_topics: list[str]) -> str:
+    def _create_evaluation_prompt(self, paper: Paper, research_topics: list[str]) -> str:
         """Create prompt for paper relevance evaluation."""
         topics_str = ", ".join(research_topics)
 
@@ -96,9 +96,9 @@ You are a research assistant evaluating academic papers for relevance to specifi
 Research Topics of Interest: {topics_str}
 
 Paper Details:
-Title: {paper.get("title", "N/A")}
-Abstract: {paper.get("summary", "N/A")}
-Categories: {", ".join(paper.get("categories", []))}
+Title: {paper.title}
+Abstract: {paper.summary}
+Categories: {", ".join(paper.categories)}
 
 Please evaluate this paper's relevance to the research topics and provide your assessment in the following JSON format:
 
@@ -207,13 +207,13 @@ Respond only with the JSON object, no additional text.
             )
 
     def evaluate_multiple_papers(
-        self, papers: list[dict[str, Any]], research_topics: list[str], threshold: float
-    ) -> list[tuple[dict[str, Any], PaperRelevance]]:
+        self, papers: list[Paper], research_topics: list[str], threshold: float
+    ) -> list[tuple[Paper, PaperRelevance]]:
         """
         Evaluate multiple papers for relevance.
 
         Args:
-            papers: List of paper dictionaries
+            papers: List of Paper objects
             research_topics: List of research topics
             threshold: Minimum relevance score
 
@@ -227,7 +227,7 @@ Respond only with the JSON object, no additional text.
                 relevance = self.evaluate_paper_relevance(paper, research_topics, threshold)
                 results.append((paper, relevance))
             except Exception as e:
-                logger.error(f"Error evaluating paper {paper.get('id', 'unknown')}: {e}")
+                logger.error(f"Error evaluating paper {paper.id}: {e}")
                 continue
 
         # Sort by relevance score (highest first)
@@ -242,16 +242,16 @@ Respond only with the JSON object, no additional text.
 
     def filter_relevant_papers(
         self,
-        papers: list[dict[str, Any]],
+        papers: list[Paper],
         research_topics: list[str],
         threshold: float,
         max_papers: int,
-    ) -> list[tuple[dict[str, Any], PaperRelevance]]:
+    ) -> list[tuple[Paper, PaperRelevance]]:
         """
         Filter and return only relevant papers.
 
         Args:
-            papers: List of paper dictionaries
+            papers: List of Paper objects
             research_topics: List of research topics
             threshold: Minimum relevance score
             max_papers: Maximum number of papers to return

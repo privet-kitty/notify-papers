@@ -6,6 +6,7 @@ from typing import Any
 import boto3
 from botocore.exceptions import ClientError
 
+from .interface import Paper
 from .logger import get_logger
 
 logger = get_logger(__name__)
@@ -53,8 +54,8 @@ class EmailNotifier:
             return text  # Return original text if translation fails
 
     def _prepare_translated_papers(
-        self, relevant_papers: list[tuple[dict[str, Any], Any]]
-    ) -> list[tuple[dict[str, Any], Any, str]]:
+        self, relevant_papers: list[tuple[Paper, Any]]
+    ) -> list[tuple[Paper, Any, str]]:
         """
         Translate all abstracts once to avoid duplicate translation calls.
 
@@ -67,14 +68,14 @@ class EmailNotifier:
         translated_papers = []
 
         for paper, relevance in relevant_papers:
-            abstract = paper.get("summary", "")
+            abstract = paper.summary
             translated_abstract = self._translate_text(abstract)
             translated_papers.append((paper, relevance, translated_abstract))
 
         return translated_papers
 
     def send_paper_notification(
-        self, relevant_papers: list[tuple[dict[str, Any], Any]], research_topics: list[str]
+        self, relevant_papers: list[tuple[Paper, Any]], research_topics: list[str]
     ) -> bool:
         """
         Send email notification with relevant papers.
@@ -192,7 +193,7 @@ Time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")}
 
     def _generate_html_body(
         self,
-        papers_with_translations: list[tuple[dict[str, Any], Any, str]],
+        papers_with_translations: list[tuple[Paper, Any, str]],
         research_topics: list[str],
     ) -> str:
         """Generate HTML email body."""
@@ -239,18 +240,18 @@ Time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")}
             score_class = "score-high" if relevance.relevance_score >= 0.8 else "score-medium"
 
             # Format authors
-            authors_str = ", ".join(paper.get("authors", [])[:3])
-            if len(paper.get("authors", [])) > 3:
-                authors_str += f" (+{len(paper['authors']) - 3} more)"
+            authors_str = ", ".join(paper.authors[:3])
+            if len(paper.authors) > 3:
+                authors_str += f" (+{len(paper.authors) - 3} more)"
 
             # Format categories
-            categories_str = ", ".join(paper.get("categories", []))
+            categories_str = ", ".join(paper.categories)
 
             html += f"""
                 <div class="paper">
                     <div class="paper-title">
-                        <a href="{paper.get("link", "#")}" style="color: #1976d2; text-decoration: none;">
-                            {paper.get("title", "Untitled")}
+                        <a href="{paper.link}" style="color: #1976d2; text-decoration: none;">
+                            {paper.title}
                         </a>
                     </div>
                     <div class="paper-authors">{authors_str}</div>
@@ -260,7 +261,7 @@ Time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")}
                             Relevance: {relevance.relevance_score:.1f}/1.0
                         </span>
                         | Categories: {categories_str}
-                        | Published: {paper.get("published", "Unknown")[:10]}
+                        | Published: {paper.published.strftime("%Y-%m-%d")}
                         | Topics: {", ".join(relevance.key_topics[:3])}
                     </div>
                 </div>
@@ -281,7 +282,7 @@ Time: {datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")}
 
     def _generate_text_body(
         self,
-        papers_with_translations: list[tuple[dict[str, Any], Any, str]],
+        papers_with_translations: list[tuple[Paper, Any, str]],
         research_topics: list[str],
     ) -> str:
         """Generate plain text email body."""
@@ -298,12 +299,12 @@ Found {len(papers_with_translations)} relevant papers from ArXiv:
 """
 
         for i, (paper, relevance, translated_abstract) in enumerate(papers_with_translations, 1):
-            authors_str = ", ".join(paper.get("authors", [])[:3])
-            if len(paper.get("authors", [])) > 3:
-                authors_str += f" (+{len(paper['authors']) - 3} more)"
+            authors_str = ", ".join(paper.authors[:3])
+            if len(paper.authors) > 3:
+                authors_str += f" (+{len(paper.authors) - 3} more)"
 
             text += f"""
-{i}. {paper.get("title", "Untitled")}
+{i}. {paper.title}
 
 Authors: {authors_str}
 Relevance Score: {relevance.relevance_score:.1f}/1.0
@@ -311,9 +312,9 @@ Key Topics: {", ".join(relevance.key_topics[:3])}
 
 Summary: {translated_abstract}
 
-ArXiv Link: {paper.get("link", "N/A")}
-Published: {paper.get("published", "Unknown")[:10]}
-Categories: {", ".join(paper.get("categories", []))}
+ArXiv Link: {paper.link}
+Published: {paper.published.strftime("%Y-%m-%d")}
+Categories: {", ".join(paper.categories)}
 
 ----------------------------------------
 """

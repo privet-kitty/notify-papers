@@ -61,11 +61,8 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
         logger.info(f"Found {len(papers)} total papers")
 
-        # Convert papers to dictionaries for processing
-        paper_dicts = [paper.model_dump() for paper in papers]
-
         # Filter out already seen papers
-        new_papers = s3_storage.filter_new_papers(paper_dicts)
+        new_papers = s3_storage.filter_new_papers(papers)
 
         if not new_papers:
             logger.info("No new papers to process")
@@ -84,7 +81,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         logger.info(f"Found {len(relevant_papers)} relevant papers")
 
         # Update seen papers list
-        new_paper_ids = [paper["id"] for paper in new_papers]
+        new_paper_ids = [paper.id for paper in new_papers]
         s3_storage.update_seen_papers(new_paper_ids)
 
         # Send email notification if there are relevant papers

@@ -5,38 +5,25 @@ from typing import Any
 
 import feedparser
 import requests
-from pydantic import BaseModel
 
+from .interface import Paper
 from .logger import get_logger
 
 logger = get_logger(__name__)
 
 
-class ArxivPaper(BaseModel):
-    """Represents a paper from ArXiv."""
-
-    id: str
-    title: str
-    summary: str
-    authors: list[str]
-    published: str
-    updated: str
-    link: str
-    categories: list[str]
-
-    @classmethod
-    def from_entry(cls, entry: dict[str, Any]) -> "ArxivPaper":
-        """Parse ArXiv API entry into ArxivPaper instance."""
-        return cls(
-            id=entry.get("id", "").split("/")[-1],
-            title=entry.get("title", "").strip(),
-            summary=entry.get("summary", "").strip().replace("\n", " "),
-            authors=[author.get("name", "") for author in entry.get("authors", [])],
-            published=entry.get("published", ""),
-            updated=entry.get("updated", ""),
-            link=entry.get("link", ""),
-            categories=[tag.get("term", "") for tag in entry.get("tags", [])],
-        )
+def parse_arxiv_entry(entry: dict[str, Any]) -> Paper:
+    """Parse ArXiv API entry into Paper instance."""
+    return Paper(
+        id=entry.get("id", "").split("/")[-1],
+        title=entry.get("title", "").strip(),
+        summary=entry.get("summary", "").strip().replace("\n", " "),
+        authors=[author.get("name", "") for author in entry.get("authors", [])],
+        published=entry.get("published", ""),
+        updated=entry.get("updated", ""),
+        link=entry.get("link", ""),
+        categories=[tag.get("term", "") for tag in entry.get("tags", [])],
+    )
 
 
 class ArxivClient:
@@ -56,7 +43,7 @@ class ArxivClient:
         max_results: int,
         days_back: int,
         categories: list[str] | None = None,
-    ) -> list[ArxivPaper]:
+    ) -> list[Paper]:
         """
         Search for papers on ArXiv.
 
@@ -95,7 +82,7 @@ class ArxivClient:
             papers = []
             for entry in feed.entries:
                 try:
-                    paper = ArxivPaper.from_entry(entry)
+                    paper = parse_arxiv_entry(entry)
                     papers.append(paper)
                 except Exception as e:
                     logger.error(f"Error parsing paper entry: {e}")
@@ -143,7 +130,7 @@ class ArxivClient:
         max_results_per_topic: int,
         days_back: int,
         categories: list[str] | None = None,
-    ) -> list[ArxivPaper]:
+    ) -> list[Paper]:
         """
         Search for papers across multiple topics and deduplicate.
 
@@ -154,9 +141,9 @@ class ArxivClient:
             categories: List of ArXiv categories to filter by
 
         Returns:
-            Deduplicated list of ArxivPaper objects
+            Deduplicated list of Paper objects
         """
-        papers_dict: dict[str, ArxivPaper] = {}
+        papers_dict: dict[str, Paper] = {}
 
         for topic in topics:
             try:

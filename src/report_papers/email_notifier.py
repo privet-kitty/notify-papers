@@ -1,5 +1,6 @@
 """SES-based email notification system for paper alerts."""
 
+import os
 from datetime import datetime
 from typing import Any
 
@@ -19,8 +20,12 @@ class EmailNotifier:
         self.sender_email = sender_email
         self.recipient_email = recipient_email
         self.target_language = target_language
-        self.ses_client = boto3.client("ses", region_name=region)
-        self.translate_client = boto3.client("translate", region_name=region)
+        
+        ses_endpoint = os.getenv("SES_ENDPOINT")
+        translate_endpoint = os.getenv("TRANSLATE_ENDPOINT")
+        
+        self.ses_client = boto3.client("ses", region_name=region, endpoint_url=ses_endpoint)
+        self.translate_client = boto3.client("translate", region_name=region, endpoint_url=translate_endpoint)
 
     def _translate_text(self, text: str) -> str:
         """

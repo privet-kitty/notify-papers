@@ -1,5 +1,6 @@
 """Main Lambda function for ArXiv paper collection agent."""
 
+import argparse
 from datetime import datetime
 from typing import Any
 
@@ -159,3 +160,50 @@ def _create_response(
     }
 
     return response
+
+
+if __name__ == "__main__":
+    """Local development execution."""
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="Run paper collection agent locally")
+    parser.add_argument(
+        "--end-date",
+        type=str,
+        help="End date for paper search (YYYY-MM-DD format). Defaults to current date.",
+    )
+    args = parser.parse_args()
+
+    # Parse end date if provided
+    end_date = None
+    if args.end_date:
+        end_date = datetime.strptime(args.end_date, "%Y-%m-%d").date()
+
+    # Create test event
+    test_event = {"inclusive_end_date": end_date.isoformat() if end_date else None}
+
+    # Mock Lambda context
+    class MockContext:
+        function_name = "local-test"
+        aws_request_id = "test-request-id"
+
+    try:
+        # Execute lambda handler
+        result = lambda_handler(test_event, MockContext())
+
+        print("✅ Execution completed!")
+        print(f"Status: {result['statusCode']}")
+        print(f"Message: {result['body']['message']}")
+
+        if result["body"].get("papers_processed"):
+            print(f"📄 Papers processed: {result['body']['papers_processed']}")
+        if result["body"].get("relevant_papers"):
+            print(f"🎯 Relevant papers found: {result['body']['relevant_papers']}")
+        if result["body"].get("email_sent"):
+            print("📧 Email sent successfully")
+            print("🌐 Check sent emails at: http://localhost:8080")
+
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        import traceback
+
+        traceback.print_exc()

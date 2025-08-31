@@ -1,6 +1,7 @@
 """S3-based storage for duplicate detection only."""
 
 import json
+import os
 import boto3
 from datetime import datetime, timedelta
 from botocore.exceptions import ClientError
@@ -16,7 +17,8 @@ class S3Storage:
 
     def __init__(self, bucket_name: str):
         self.bucket_name = bucket_name
-        self.s3_client = boto3.client("s3")
+        s3_endpoint = os.getenv("S3_ENDPOINT")
+        self.s3_client = boto3.client("s3", endpoint_url=s3_endpoint)
 
     def load_seen_papers(self) -> set[str]:
         """

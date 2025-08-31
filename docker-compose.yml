@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  s3mock:
+    image: adobe/s3mock:latest
+    ports:
+      - "9090:9090"
+    environment:
+      - initialBuckets=report-papers-local
+    volumes:
+      - ./data/s3mock:/tmp/s3mock
+
+  aws-ses-local:
+    image: ghcr.io/domdomegg/aws-ses-v2-local:latest
+    ports:
+      - "8005:8005"
+    environment:
+      - SES_PORT=8005
+      - SES_HOST=0.0.0.0

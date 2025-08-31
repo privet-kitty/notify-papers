@@ -15,12 +15,12 @@ output "lambda_function_arn" {
 
 output "lambda_execution_command" {
   description = "Command to invoke the Lambda function"
-  value = <<EOF
+  value       = <<EOF
 aws lambda invoke \
+  --cli-binary-format raw-in-base64-out \
   --function-name ${aws_lambda_function.paper_agent.arn} \
   --region ${var.aws_region} \
   --payload '{"inclusive_end_date":null}' \
   /dev/stdout
 EOF
 }
-

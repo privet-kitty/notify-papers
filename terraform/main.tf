@@ -151,6 +151,9 @@ resource "aws_cloudwatch_event_target" "lambda_target" {
   rule      = aws_cloudwatch_event_rule.daily_schedule.name
   target_id = "TriggerLambda"
   arn       = aws_lambda_function.paper_agent.arn
+  input     = jsonencode({
+    inclusive_end_date = null
+  })
 }
 
 # Lambda permission for CloudWatch Events

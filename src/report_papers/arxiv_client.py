@@ -1,6 +1,6 @@
 """ArXiv API client for paper search and retrieval."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from typing import Any
 
 import feedparser
@@ -38,7 +38,7 @@ class ArxivClient:
         )
 
     def search_papers(
-        self, query: str, max_results: int, days_back: int, categories: list[str]
+        self, query: str, max_results: int, days_back: int, categories: list[str], end_date: date | None = None
     ) -> list[Paper]:
         """
         Search for papers on ArXiv.
@@ -46,14 +46,15 @@ class ArxivClient:
         Args:
             query: Search query terms
             max_results: Maximum number of results to return
-            days_back: Number of days to look back from today
+            days_back: Number of days to look back from end_date
             categories: List of ArXiv categories to filter by
+            end_date: End date for search period (defaults to today)
 
         Returns:
             list of ArxivPaper objects
         """
         # Build search query
-        search_query = self._build_search_query(query, days_back, categories)
+        search_query = self._build_search_query(query, days_back, categories, end_date)
 
         params = {
             "search_query": search_query,
@@ -94,13 +95,16 @@ class ArxivClient:
             logger.error(f"Unexpected error in ArXiv search: {e}")
             raise
 
-    def _build_search_query(self, query: str, days_back: int, categories: list[str]) -> str:
+    def _build_search_query(self, query: str, days_back: int, categories: list[str], end_date: date | None = None) -> str:
         """Build ArXiv search query string."""
         # Date range
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=days_back)
+        if end_date is None:
+            end_date_dt = datetime.now()
+        else:
+            end_date_dt = datetime.combine(end_date, datetime.min.time())
+        start_date = end_date_dt - timedelta(days=days_back)
 
-        date_range = f"[{start_date.strftime('%Y%m%d')}* TO {end_date.strftime('%Y%m%d')}*]"
+        date_range = f"[{start_date.strftime('%Y%m%d')}* TO {end_date_dt.strftime('%Y%m%d')}*]"
 
         # Base query with date filter
         query_parts = [f"({query})", f"submittedDate:{date_range}"]
@@ -117,6 +121,7 @@ class ArxivClient:
         max_results_per_topic: int,
         days_back: int,
         categories: list[str],
+        end_date: date | None = None,
     ) -> list[Paper]:
         """
         Search for papers across multiple topics and deduplicate.
@@ -124,8 +129,9 @@ class ArxivClient:
         Args:
             topics: List of search topics
             max_results_per_topic: Max results per topic
-            days_back: Number of days to look back
+            days_back: Number of days to look back from end_date
             categories: List of ArXiv categories to filter by
+            end_date: End date for search period (defaults to today)
 
         Returns:
             Deduplicated list of Paper objects
@@ -139,6 +145,7 @@ class ArxivClient:
                     max_results=max_results_per_topic,
                     days_back=days_back,
                     categories=categories,
+                    end_date=end_date,
                 )
 
                 # Use dict for automatic deduplication by paper ID

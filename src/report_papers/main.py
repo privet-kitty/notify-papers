@@ -6,6 +6,7 @@ from typing import Any
 from .arxiv_client import ArxivClient
 from .config import get_environment_config
 from .email_notifier import EmailNotifier
+from .interface import LambdaEvent
 from .llm_client import LLMClient
 from .logger import get_logger
 from .s3_storage import S3Storage
@@ -24,6 +25,8 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     Returns:
         Response dictionary
     """
+    # Parse Lambda event
+    lambda_event = LambdaEvent.model_validate(event)
     start_time = datetime.now()
 
     try:
@@ -53,6 +56,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             max_results_per_topic=config["max_results_per_topic"],
             days_back=config["days_back"],
             categories=config["arxiv_categories"],
+            end_date=lambda_event.inclusive_end_date,
         )
 
         if not papers:

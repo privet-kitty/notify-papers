@@ -2,6 +2,7 @@
 name = "report-papers"
 version = "0.1.0"
 description = "ArXiv paper auto-collection AI agent"
+license = { file = "LICENSE" }
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -34,9 +35,4 @@ line-length = 100
 packages = ["src/report_papers"]
 
 [dependency-groups]
-dev = [
-    "mypy",
-    "pytest>=8.4.1",
-    "ruff",
-    "types-requests>=2.32.4.20250809",
-]
+dev = ["mypy", "pytest>=8.4.1", "ruff", "types-requests>=2.32.4.20250809"]

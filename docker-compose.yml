@@ -7,8 +7,9 @@ services:
       - "9090:9090"
     environment:
       - initialBuckets=report-papers-local
+      - root=/s3mock
     volumes:
-      - ./data/s3mock:/tmp/s3mock
+      - ./data/s3mock:/s3mock
 
   aws-ses-local:
     image: ghcr.io/domdomegg/aws-ses-v2-local:latest
@@ -17,3 +18,8 @@ services:
     environment:
       - SES_PORT=8005
       - SES_HOST=0.0.0.0
+
+  teams-webhook-mock:
+    image: ghcr.io/tarampampam/webhook-tester:2
+    ports:
+      - "8006:8080"

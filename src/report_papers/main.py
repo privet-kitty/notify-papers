@@ -150,7 +150,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             f"new_papers={len(new_papers)}, "
             f"relevant_papers={len(relevant_papers)}, "
             f"processing_time={processing_time:.2f}s, "
-            f"email_sent={len(relevant_papers) > 0}, "
+            f"notification_sent={len(relevant_papers) > 0}, "
             f"topics={config['research_topics']}"
         )
 
@@ -160,7 +160,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             {
                 "papers_processed": len(new_papers),
                 "relevant_papers": len(relevant_papers),
-                "email_sent": len(relevant_papers)
+                "notification_sent": len(relevant_papers)
                 > 0,  # True if we reach this point with relevant papers
             },
         )
@@ -262,9 +262,8 @@ if __name__ == "__main__":
             print(f"📄 Papers processed: {result['body']['papers_processed']}")
         if result["body"].get("relevant_papers"):
             print(f"🎯 Relevant papers found: {result['body']['relevant_papers']}")
-        if result["body"].get("email_sent"):
-            print("📧 Email sent successfully")
-            print("🌐 Check sent emails at: http://localhost:8080")
+        if result["body"].get("notification_sent"):
+            print("📧 Notification sent successfully")
 
     except Exception as e:
         print(f"❌ Error: {e}")

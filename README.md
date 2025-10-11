@@ -97,4 +97,3 @@ Also, ensure you have the following prerequisites:
      ```bash
      open http://localhost:8005
      ```
-   - **Teams**: Check your configured Teams channel

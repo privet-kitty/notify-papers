@@ -11,6 +11,7 @@ from .interface import LambdaEvent
 from .llm_client import LLMClient
 from .logger import get_logger
 from .s3_storage import S3Storage
+from .teams_notifier import TeamsNotifier
 
 logger = get_logger(__name__)
 
@@ -41,12 +42,23 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         s3_storage = S3Storage(config["s3_bucket"])
         arxiv_client = ArxivClient()
         llm_client = LLMClient(model=config["llm_model"], region=config["aws_bedrock_region"])
-        email_notifier = EmailNotifier(
-            config["email_recipient"],
-            config["email_recipient"],
-            region=config["aws_bedrock_region"],
-            target_language=config["translate_target_language"],
-        )
+
+        # Initialize notifiers based on configuration
+        email_notifier = None
+        if config["email_recipient"]:
+            email_notifier = EmailNotifier(
+                config["email_recipient"],
+                config["email_recipient"],
+                region=config["aws_bedrock_region"],
+                target_language=config["translate_target_language"],
+            )
+
+        teams_notifier = None
+        if config["teams_webhook_url"]:
+            teams_notifier = TeamsNotifier(
+                config["teams_webhook_url"],
+                target_language=config["translate_target_language"],
+            )
 
         # Configuration is already merged with hardcoded overrides
 
@@ -89,16 +101,37 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         new_paper_ids = [paper.id for paper in new_papers]
         s3_storage.update_seen_papers(new_paper_ids)
 
-        # Send email notification if there are relevant papers
+        # Send notifications if there are relevant papers
         if relevant_papers:
-            success = email_notifier.send_paper_notification(
-                relevant_papers, config["research_topics"]
-            )
+            notification_results = []
 
-            if success:
-                logger.info("Email notification sent successfully")
-            else:
-                error_msg = "Failed to send email notification"
+            # Send email notification
+            if email_notifier:
+                email_success = email_notifier.send_paper_notification(
+                    relevant_papers, config["research_topics"]
+                )
+                notification_results.append(("Email", email_success))
+
+                if email_success:
+                    logger.info("Email notification sent successfully")
+                else:
+                    logger.error("Failed to send email notification")
+
+            # Send Teams notification
+            if teams_notifier:
+                teams_success = teams_notifier.send_paper_notification(
+                    relevant_papers, config["research_topics"]
+                )
+                notification_results.append(("Teams", teams_success))
+
+                if teams_success:
+                    logger.info("Teams notification sent successfully")
+                else:
+                    logger.error("Failed to send Teams notification")
+
+            # Check if all notifications failed
+            if notification_results and not any(success for _, success in notification_results):
+                error_msg = "All notification methods failed"
                 logger.error(error_msg)
                 raise RuntimeError(error_msg)
 
@@ -129,18 +162,36 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         error_msg = f"Error in paper collection agent: {str(e)}"
         logger.error(error_msg, exc_info=True)
 
-        # Try to send error notification
+        # Try to send error notifications
         try:
             config = get_environment_config()
-            email_notifier = EmailNotifier(
-                config["email_recipient"],
-                config["email_recipient"],
-                region=config["aws_bedrock_region"],
-                target_language=config["translate_target_language"],
-            )
-            email_notifier.send_error_notification(error_msg)
-        except Exception as email_error:
-            logger.error(f"Failed to send error notification: {email_error}")
+
+            # Send email error notification
+            if config["email_recipient"]:
+                try:
+                    email_notifier = EmailNotifier(
+                        config["email_recipient"],
+                        config["email_recipient"],
+                        region=config["aws_bedrock_region"],
+                        target_language=config["translate_target_language"],
+                    )
+                    email_notifier.send_error_notification(error_msg)
+                except Exception as email_error:
+                    logger.error(f"Failed to send email error notification: {email_error}")
+
+            # Send Teams error notification
+            if config["teams_webhook_url"]:
+                try:
+                    teams_notifier = TeamsNotifier(
+                        config["teams_webhook_url"],
+                        target_language=config["translate_target_language"],
+                    )
+                    teams_notifier.send_error_notification(error_msg)
+                except Exception as teams_error:
+                    logger.error(f"Failed to send Teams error notification: {teams_error}")
+
+        except Exception as notification_error:
+            logger.error(f"Failed to send error notifications: {notification_error}")
 
         return _create_response(500, error_msg, {"error": True})
 

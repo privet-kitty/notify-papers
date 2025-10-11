@@ -117,13 +117,14 @@ resource "aws_lambda_function" "paper_agent" {
 
   environment {
     variables = {
-      S3_PAPERS_BUCKET = aws_s3_bucket.papers_bucket.bucket
-      EMAIL_RECIPIENT  = var.email_recipient
-      RESEARCH_TOPICS  = join(",", var.research_topics)
-      LLM_MODEL        = var.llm_model
-      AWS_BEDROCK_REGION = var.aws_region
+      S3_PAPERS_BUCKET          = aws_s3_bucket.papers_bucket.bucket
+      EMAIL_RECIPIENT           = var.email_recipient
+      TEAMS_WEBHOOK_URL         = var.teams_webhook_url
+      RESEARCH_TOPICS           = join(",", var.research_topics)
+      LLM_MODEL                 = var.llm_model
+      AWS_BEDROCK_REGION        = var.aws_region
       TRANSLATE_TARGET_LANGUAGE = var.translate_target_language
-      ARXIV_CATEGORIES = join(",", var.arxiv_categories)
+      ARXIV_CATEGORIES          = join(",", var.arxiv_categories)
     }
   }
 
@@ -165,7 +166,8 @@ resource "aws_lambda_permission" "allow_cloudwatch" {
   source_arn    = aws_cloudwatch_event_rule.daily_schedule.arn
 }
 
-# SES Email Identity
+# SES Email Identity (only if email_recipient is set)
 resource "aws_ses_email_identity" "sender" {
+  count = var.email_recipient != null ? 1 : 0
   email = var.email_recipient
 }

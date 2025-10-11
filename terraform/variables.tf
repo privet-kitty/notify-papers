@@ -12,8 +12,16 @@ variable "project_name" {
 }
 
 variable "email_recipient" {
-  description = "Email recipient for notifications"
+  description = "Email recipient for notifications (optional if teams_webhook_url is set)"
   type        = string
+  default     = null
+}
+
+variable "teams_webhook_url" {
+  description = "Microsoft Teams webhook URL for notifications (optional if email_recipient is set)"
+  type        = string
+  default     = null
+  sensitive   = true
 }
 
 variable "translate_target_language" {

@@ -12,7 +12,8 @@ class AgentConfig(TypedDict, total=True):
     """
 
     # Required fields from environment
-    email_recipient: str
+    email_recipient: str | None
+    teams_webhook_url: str | None
     s3_bucket: str
 
     # Required fields with defaults
@@ -36,12 +37,18 @@ def get_environment_config() -> AgentConfig:
         AgentConfig: Configuration dictionary with all required fields populated
 
     Raises:
-        ValueError: If required environment variables are not set
+        ValueError: If required environment variables are not set or if no notification method is configured
     """
-    # Validate required environment variables
-    email_recipient = os.environ.get("EMAIL_RECIPIENT")
-    if not email_recipient:
-        raise ValueError("EMAIL_RECIPIENT environment variable is required")
+    # Get notification configuration
+    email_recipient = os.environ.get("EMAIL_RECIPIENT") or None
+    teams_webhook_url = os.environ.get("TEAMS_WEBHOOK_URL") or None
+
+    # Validate that at least one notification method is configured
+    if not email_recipient and not teams_webhook_url:
+        raise ValueError(
+            "At least one notification method must be configured: "
+            "EMAIL_RECIPIENT or TEAMS_WEBHOOK_URL"
+        )
 
     s3_bucket = os.environ.get("S3_PAPERS_BUCKET")
     if not s3_bucket:
@@ -51,6 +58,7 @@ def get_environment_config() -> AgentConfig:
     config: AgentConfig = {
         # Required fields from environment
         "email_recipient": email_recipient,
+        "teams_webhook_url": teams_webhook_url,
         "s3_bucket": s3_bucket,
         # Fields with defaults that can be overridden
         "research_topics": [

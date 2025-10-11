@@ -9,6 +9,7 @@ from botocore.exceptions import ClientError
 
 from .interface import Paper
 from .logger import get_logger
+from .translator import Translator
 
 logger = get_logger(__name__)
 
@@ -16,47 +17,14 @@ logger = get_logger(__name__)
 class EmailNotifier:
     """SES-based email notification system with translation support."""
 
-    def __init__(self, sender_email: str, recipient_email: str, region: str, target_language: str):
+    def __init__(self, sender_email: str, recipient_email: str, region: str, translator: Translator):
         self.sender_email = sender_email
         self.recipient_email = recipient_email
-        self.target_language = target_language
-        
+        self.translator = translator
+
         ses_endpoint = os.getenv("SES_ENDPOINT")
-        translate_endpoint = os.getenv("TRANSLATE_ENDPOINT")
-        
+
         self.ses_client = boto3.client("ses", region_name=region, endpoint_url=ses_endpoint)
-        self.translate_client = boto3.client("translate", region_name=region, endpoint_url=translate_endpoint)
-
-    def _translate_text(self, text: str) -> str:
-        """
-        Translate text to the target language using Amazon Translate.
-
-        Args:
-            text: Text to translate
-
-        Returns:
-            Translated text in target language, or original text if translation fails or target is 'en'
-        """
-        if not text or not text.strip():
-            return text
-
-        # Skip translation if target language is English
-        if self.target_language == "en":
-            return text
-
-        try:
-            response = self.translate_client.translate_text(
-                Text=text, SourceLanguageCode="en", TargetLanguageCode=self.target_language
-            )
-            translated_text = response["TranslatedText"]
-            logger.info(
-                f"Successfully translated text to {self.target_language}: {len(text)} chars -> {len(translated_text)} chars"
-            )
-            return str(translated_text)
-
-        except Exception as e:
-            logger.warning(f"Failed to translate text to {self.target_language}: {e}")
-            return text  # Return original text if translation fails
 
     def _prepare_translated_papers(
         self, relevant_papers: list[tuple[Paper, Any]]
@@ -74,7 +42,7 @@ class EmailNotifier:
 
         for paper, relevance in relevant_papers:
             abstract = paper.summary
-            translated_abstract = self._translate_text(abstract)
+            translated_abstract = self.translator.translate_text(abstract)
             translated_papers.append((paper, relevance, translated_abstract))
 
         return translated_papers

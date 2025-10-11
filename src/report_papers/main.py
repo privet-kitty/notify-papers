@@ -12,6 +12,7 @@ from .llm_client import LLMClient
 from .logger import get_logger
 from .s3_storage import S3Storage
 from .teams_notifier import TeamsNotifier
+from .translator import Translator
 
 logger = get_logger(__name__)
 
@@ -43,6 +44,12 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         arxiv_client = ArxivClient()
         llm_client = LLMClient(model=config["llm_model"], region=config["aws_bedrock_region"])
 
+        # Initialize translator (shared by all notifiers)
+        translator = Translator(
+            region=config["aws_bedrock_region"],
+            target_language=config["translate_target_language"],
+        )
+
         # Initialize notifiers based on configuration
         email_notifier = None
         if config["email_recipient"]:
@@ -50,14 +57,14 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 config["email_recipient"],
                 config["email_recipient"],
                 region=config["aws_bedrock_region"],
-                target_language=config["translate_target_language"],
+                translator=translator,
             )
 
         teams_notifier = None
         if config["teams_webhook_url"]:
             teams_notifier = TeamsNotifier(
                 config["teams_webhook_url"],
-                target_language=config["translate_target_language"],
+                translator=translator,
             )
 
         # Configuration is already merged with hardcoded overrides
@@ -166,6 +173,12 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         try:
             config = get_environment_config()
 
+            # Initialize translator for error notifications
+            translator = Translator(
+                region=config["aws_bedrock_region"],
+                target_language=config["translate_target_language"],
+            )
+
             # Send email error notification
             if config["email_recipient"]:
                 try:
@@ -173,7 +186,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                         config["email_recipient"],
                         config["email_recipient"],
                         region=config["aws_bedrock_region"],
-                        target_language=config["translate_target_language"],
+                        translator=translator,
                     )
                     email_notifier.send_error_notification(error_msg)
                 except Exception as email_error:
@@ -184,7 +197,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 try:
                     teams_notifier = TeamsNotifier(
                         config["teams_webhook_url"],
-                        target_language=config["translate_target_language"],
+                        translator=translator,
                     )
                     teams_notifier.send_error_notification(error_msg)
                 except Exception as teams_error:

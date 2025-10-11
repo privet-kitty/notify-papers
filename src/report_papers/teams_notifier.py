@@ -7,6 +7,7 @@ import requests
 
 from .interface import Paper
 from .logger import get_logger
+from .translator import Translator
 
 logger = get_logger(__name__)
 
@@ -14,9 +15,9 @@ logger = get_logger(__name__)
 class TeamsNotifier:
     """Microsoft Teams notification system using Adaptive Cards."""
 
-    def __init__(self, webhook_url: str, target_language: str):
+    def __init__(self, webhook_url: str, translator: Translator):
         self.webhook_url = webhook_url
-        self.target_language = target_language
+        self.translator = translator
 
     def _send_adaptive_card(self, card_content: dict[str, Any]) -> bool:
         """
@@ -75,12 +76,35 @@ class TeamsNotifier:
             return True
 
         try:
-            card_content = self._generate_papers_card(relevant_papers, research_topics)
+            # Translate paper summaries
+            translated_papers = self._prepare_translated_papers(relevant_papers)
+            card_content = self._generate_papers_card(translated_papers, research_topics)
             return self._send_adaptive_card(card_content)
 
         except Exception as e:
             logger.error(f"Error generating Teams notification: {e}")
             return False
+
+    def _prepare_translated_papers(
+        self, relevant_papers: list[tuple[Paper, Any]]
+    ) -> list[tuple[Paper, Any, str]]:
+        """
+        Translate all abstracts once to avoid duplicate translation calls.
+
+        Args:
+            relevant_papers: List of (paper, relevance) tuples
+
+        Returns:
+            List of (paper, relevance, translated_abstract) tuples
+        """
+        translated_papers = []
+
+        for paper, relevance in relevant_papers:
+            abstract = paper.summary
+            translated_abstract = self.translator.translate_text(abstract)
+            translated_papers.append((paper, relevance, translated_abstract))
+
+        return translated_papers
 
     def send_error_notification(self, error_message: str) -> bool:
         """
@@ -140,13 +164,13 @@ class TeamsNotifier:
             return False
 
     def _generate_papers_card(
-        self, relevant_papers: list[tuple[Paper, Any]], research_topics: list[str]
+        self, papers_with_translations: list[tuple[Paper, Any, str]], research_topics: list[str]
     ) -> dict[str, Any]:
         """
         Generate Adaptive Card for paper notifications.
 
         Args:
-            relevant_papers: List of (paper, relevance) tuples
+            papers_with_translations: List of (paper, relevance, translated_abstract) tuples
             research_topics: List of research topics
 
         Returns:
@@ -163,7 +187,7 @@ class TeamsNotifier:
                 "items": [
                     {
                         "type": "TextBlock",
-                        "text": f"{len(relevant_papers)} New Relevant Papers",
+                        "text": f"{len(papers_with_translations)} New Relevant Papers",
                         "weight": "bolder",
                         "size": "large",
                         "wrap": True,
@@ -186,13 +210,13 @@ class TeamsNotifier:
         ]
 
         # Add each paper as a container
-        for i, (paper, relevance) in enumerate(relevant_papers):
+        for i, (paper, relevance, translated_abstract) in enumerate(papers_with_translations):
             # Limit to first 5 papers to avoid message size limits
             if i >= 5:
                 body.append(
                     {
                         "type": "TextBlock",
-                        "text": f"... and {len(relevant_papers) - 5} more papers",
+                        "text": f"... and {len(papers_with_translations) - 5} more papers",
                         "weight": "bolder",
                         "spacing": "medium",
                         "wrap": True,
@@ -224,7 +248,7 @@ class TeamsNotifier:
                 },
                 {
                     "type": "TextBlock",
-                    "text": paper.summary,
+                    "text": translated_abstract,
                     "wrap": True,
                     "spacing": "small",
                 },

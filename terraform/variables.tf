@@ -46,3 +46,9 @@ variable "llm_model" {
   type        = string
   default     = "anthropic.claude-3-haiku-20240307-v1:0"
 }
+
+variable "iam_permissions_boundary" {
+  description = "ARN of the IAM permissions boundary to attach to roles (optional)"
+  type        = string
+  default     = null
+}

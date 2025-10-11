@@ -27,7 +27,8 @@ resource "random_id" "bucket_suffix" {
 
 # IAM Role for Lambda
 resource "aws_iam_role" "lambda_role" {
-  name = "${var.project_name}-lambda-role"
+  name                 = "${var.project_name}-lambda-role"
+  permissions_boundary = var.iam_permissions_boundary
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"

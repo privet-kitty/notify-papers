@@ -144,8 +144,8 @@ resource "aws_cloudwatch_log_group" "lambda_logs" {
 # CloudWatch Event Rule (daily schedule)
 resource "aws_cloudwatch_event_rule" "daily_schedule" {
   name                = "${var.project_name}-daily-schedule"
-  description         = "Trigger paper agent daily"
-  schedule_expression = "cron(0 9 * * ? *)"  # 9 AM UTC daily
+  description         = "Trigger paper agent on schedule"
+  schedule_expression = var.schedule_expression
 }
 
 # CloudWatch Event Target

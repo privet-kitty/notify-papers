@@ -52,3 +52,9 @@ variable "iam_permissions_boundary" {
   type        = string
   default     = null
 }
+
+variable "schedule_expression" {
+  description = "CloudWatch Events schedule expression (cron or rate)"
+  type        = string
+  default     = "cron(0 9 * * ? *)"  # 9 AM UTC daily
+}

@@ -45,7 +45,10 @@ class Translator:
 
         try:
             response = self.translate_client.translate_text(
-                Text=text, SourceLanguageCode="en", TargetLanguageCode=self.target_language
+                Text=text,
+                SourceLanguageCode="en",
+                TargetLanguageCode=self.target_language,
+                Settings={"Formality": "FORMAL"},
             )
             translated_text = response["TranslatedText"]
             logger.info(

@@ -210,20 +210,7 @@ class TeamsNotifier:
         ]
 
         # Add each paper as a container
-        for i, (paper, relevance, translated_abstract) in enumerate(papers_with_translations):
-            # Limit to first 5 papers to avoid message size limits
-            if i >= 5:
-                body.append(
-                    {
-                        "type": "TextBlock",
-                        "text": f"... and {len(papers_with_translations) - 5} more papers",
-                        "weight": "bolder",
-                        "spacing": "medium",
-                        "wrap": True,
-                    }
-                )
-                break
-
+        for paper, relevance, translated_abstract in papers_with_translations:
             # Format authors
             authors_str = ", ".join(paper.authors[:3])
             if len(paper.authors) > 3:

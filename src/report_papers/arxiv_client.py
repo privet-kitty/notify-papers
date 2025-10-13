@@ -38,7 +38,12 @@ class ArxivClient:
         )
 
     def search_papers(
-        self, query: str, max_results: int, days_back: int, categories: list[str], end_date: date | None = None
+        self,
+        query: str,
+        max_results: int,
+        days_back: int,
+        categories: list[str],
+        end_date: date | None = None,
     ) -> list[Paper]:
         """
         Search for papers on ArXiv.
@@ -95,7 +100,9 @@ class ArxivClient:
             logger.error(f"Unexpected error in ArXiv search: {e}")
             raise
 
-    def _build_search_query(self, query: str, days_back: int, categories: list[str], end_date: date | None = None) -> str:
+    def _build_search_query(
+        self, query: str, days_back: int, categories: list[str], end_date: date | None = None
+    ) -> str:
         """Build ArXiv search query string."""
         # Date range
         if end_date is None:

@@ -84,9 +84,7 @@ class TeamsNotifier:
             translated_papers = self._prepare_translated_papers(relevant_papers)
 
             # Find optimal number of papers that fit within size limit
-            optimal_count = self._find_optimal_paper_count(
-                translated_papers, research_topics
-            )
+            optimal_count = self._find_optimal_paper_count(translated_papers, research_topics)
 
             if optimal_count < len(translated_papers):
                 logger.warning(

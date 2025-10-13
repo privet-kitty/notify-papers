@@ -1,5 +1,6 @@
 """Microsoft Teams notification system for paper alerts."""
 
+import json
 from datetime import datetime
 from typing import Any
 
@@ -10,6 +11,9 @@ from .logger import get_logger
 from .translator import Translator
 
 logger = get_logger(__name__)
+
+# Teams webhook payload size limit (28KB), use 27KB for safety margin
+MAX_PAYLOAD_SIZE_BYTES = 27 * 1024
 
 
 class TeamsNotifier:
@@ -78,7 +82,21 @@ class TeamsNotifier:
         try:
             # Translate paper summaries
             translated_papers = self._prepare_translated_papers(relevant_papers)
-            card_content = self._generate_papers_card(translated_papers, research_topics)
+
+            # Find optimal number of papers that fit within size limit
+            optimal_count = self._find_optimal_paper_count(
+                translated_papers, research_topics
+            )
+
+            if optimal_count < len(translated_papers):
+                logger.warning(
+                    f"Payload size limit: showing {optimal_count} of {len(translated_papers)} papers"
+                )
+
+            # Generate card with optimal number of papers
+            card_content = self._generate_papers_card(
+                translated_papers[:optimal_count], research_topics, len(translated_papers)
+            )
             return self._send_adaptive_card(card_content)
 
         except Exception as e:
@@ -105,6 +123,62 @@ class TeamsNotifier:
             translated_papers.append((paper, relevance, translated_abstract))
 
         return translated_papers
+
+    def _find_optimal_paper_count(
+        self,
+        translated_papers: list[tuple[Paper, Any, str]],
+        research_topics: list[str],
+    ) -> int:
+        """
+        Find optimal number of papers that fit within payload size limit using binary search.
+
+        Args:
+            translated_papers: List of (paper, relevance, translated_abstract) tuples
+            research_topics: List of research topics
+
+        Returns:
+            Optimal number of papers that fit within size limit
+        """
+        if not translated_papers:
+            return 0
+
+        # Binary search for optimal count
+        # ok: number of papers that fit within size limit
+        # ng: number of papers that exceed size limit
+        ok, ng = 0, len(translated_papers) + 1
+
+        while abs(ok - ng) > 1:
+            mid = (ok + ng) // 2
+            card_content = self._generate_papers_card(
+                translated_papers[:mid], research_topics, len(translated_papers)
+            )
+
+            # Convert to JSON and check size
+            payload = {
+                "type": "message",
+                "attachments": [
+                    {
+                        "contentType": "application/vnd.microsoft.card.adaptive",
+                        "content": card_content,
+                    }
+                ],
+            }
+            payload_size = len(json.dumps(payload).encode("utf-8"))
+
+            if payload_size <= MAX_PAYLOAD_SIZE_BYTES:
+                # This count fits
+                ok = mid
+                logger.debug(f"Paper count {mid} fits ({payload_size} bytes)")
+            else:
+                # Too large
+                ng = mid
+                logger.debug(f"Paper count {mid} too large ({payload_size} bytes)")
+
+        logger.info(
+            f"Optimal paper count: {ok} of {len(translated_papers)} "
+            f"papers fit within {MAX_PAYLOAD_SIZE_BYTES} bytes limit"
+        )
+        return ok
 
     def send_error_notification(self, error_message: str) -> bool:
         """
@@ -164,7 +238,10 @@ class TeamsNotifier:
             return False
 
     def _generate_papers_card(
-        self, papers_with_translations: list[tuple[Paper, Any, str]], research_topics: list[str]
+        self,
+        papers_with_translations: list[tuple[Paper, Any, str]],
+        research_topics: list[str],
+        total_papers: int | None = None,
     ) -> dict[str, Any]:
         """
         Generate Adaptive Card for paper notifications.
@@ -172,12 +249,22 @@ class TeamsNotifier:
         Args:
             papers_with_translations: List of (paper, relevance, translated_abstract) tuples
             research_topics: List of research topics
+            total_papers: Total number of papers (if different from shown count)
 
         Returns:
             Adaptive Card JSON structure
         """
         topics_str = ", ".join(research_topics)
         date_str = datetime.now().strftime("%Y-%m-%d")
+
+        # Determine header text
+        if total_papers and total_papers > len(papers_with_translations):
+            header_text = (
+                f"{len(papers_with_translations)} of {total_papers} New Relevant Papers "
+                f"(size limit reached)"
+            )
+        else:
+            header_text = f"{len(papers_with_translations)} New Relevant Papers"
 
         # Build card body
         body: list[dict[str, Any]] = [
@@ -187,7 +274,7 @@ class TeamsNotifier:
                 "items": [
                     {
                         "type": "TextBlock",
-                        "text": f"{len(papers_with_translations)} New Relevant Papers",
+                        "text": header_text,
                         "weight": "bolder",
                         "size": "large",
                         "wrap": True,

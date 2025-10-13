@@ -212,9 +212,7 @@ class TeamsNotifier:
         # Add each paper as a container
         for paper, relevance, translated_abstract in papers_with_translations:
             # Format authors
-            authors_str = ", ".join(paper.authors[:3])
-            if len(paper.authors) > 3:
-                authors_str += f" (+{len(paper.authors) - 3} more)"
+            authors_str = ", ".join(paper.authors)
 
             # Determine relevance indicator
             score_emoji = "🟢" if relevance.relevance_score >= 0.8 else "🟡"

@@ -67,13 +67,14 @@ class TeamsNotifier:
     ) -> bool:
         """
         Send Teams notification with relevant papers.
+        If papers exceed size limit, split into multiple messages.
 
         Args:
             relevant_papers: List of (paper, relevance) tuples
             research_topics: List of research topics
 
         Returns:
-            True if notification sent successfully, False otherwise
+            True if all notifications sent successfully, False otherwise
         """
         if not relevant_papers:
             logger.info("No relevant papers to send")
@@ -83,19 +84,32 @@ class TeamsNotifier:
             # Translate paper summaries
             translated_papers = self._prepare_translated_papers(relevant_papers)
 
-            # Find optimal number of papers that fit within size limit
-            optimal_count = self._find_optimal_paper_count(translated_papers, research_topics)
+            # Split papers into chunks that fit within size limit
+            paper_chunks = self._split_papers_into_chunks(translated_papers, research_topics)
 
-            if optimal_count < len(translated_papers):
-                logger.warning(
-                    f"Payload size limit: showing {optimal_count} of {len(translated_papers)} papers"
-                )
-
-            # Generate card with optimal number of papers
-            card_content = self._generate_papers_card(
-                translated_papers[:optimal_count], research_topics, len(translated_papers)
+            logger.info(
+                f"Sending {len(translated_papers)} papers in {len(paper_chunks)} message(s)"
             )
-            return self._send_adaptive_card(card_content)
+
+            # Send each chunk
+            all_success = True
+            for i, chunk in enumerate(paper_chunks, 1):
+                card_content = self._generate_papers_card(
+                    chunk,
+                    research_topics,
+                    total_papers=len(translated_papers),
+                    chunk_index=i,
+                    total_chunks=len(paper_chunks),
+                )
+                success = self._send_adaptive_card(card_content)
+
+                if success:
+                    logger.info(f"Sent message {i}/{len(paper_chunks)} successfully")
+                else:
+                    logger.error(f"Failed to send message {i}/{len(paper_chunks)}")
+                    all_success = False
+
+            return all_success
 
         except Exception as e:
             logger.error(f"Error generating Teams notification: {e}")
@@ -178,6 +192,42 @@ class TeamsNotifier:
         )
         return ok
 
+    def _split_papers_into_chunks(
+        self,
+        translated_papers: list[tuple[Paper, Any, str]],
+        research_topics: list[str],
+    ) -> list[list[tuple[Paper, Any, str]]]:
+        """
+        Split papers into chunks that fit within payload size limit.
+
+        Args:
+            translated_papers: List of (paper, relevance, translated_abstract) tuples
+            research_topics: List of research topics
+
+        Returns:
+            List of paper chunks
+        """
+        if not translated_papers:
+            return []
+
+        chunks: list[list[tuple[Paper, Any, str]]] = []
+        remaining_papers = translated_papers[:]
+
+        while remaining_papers:
+            # Find optimal count for remaining papers
+            optimal_count = self._find_optimal_paper_count(remaining_papers, research_topics)
+
+            if optimal_count == 0:
+                # Even a single paper is too large - this shouldn't happen normally
+                logger.error("Single paper exceeds size limit, skipping remaining papers")
+                break
+
+            # Add chunk
+            chunks.append(remaining_papers[:optimal_count])
+            remaining_papers = remaining_papers[optimal_count:]
+
+        return chunks
+
     def send_error_notification(self, error_message: str) -> bool:
         """
         Send error notification to Teams.
@@ -240,6 +290,8 @@ class TeamsNotifier:
         papers_with_translations: list[tuple[Paper, Any, str]],
         research_topics: list[str],
         total_papers: int | None = None,
+        chunk_index: int | None = None,
+        total_chunks: int | None = None,
     ) -> dict[str, Any]:
         """
         Generate Adaptive Card for paper notifications.
@@ -248,6 +300,8 @@ class TeamsNotifier:
             papers_with_translations: List of (paper, relevance, translated_abstract) tuples
             research_topics: List of research topics
             total_papers: Total number of papers (if different from shown count)
+            chunk_index: Current chunk index (1-based)
+            total_chunks: Total number of chunks
 
         Returns:
             Adaptive Card JSON structure
@@ -256,13 +310,14 @@ class TeamsNotifier:
         date_str = datetime.now().strftime("%Y-%m-%d")
 
         # Determine header text
-        if total_papers and total_papers > len(papers_with_translations):
+        if chunk_index and total_chunks and total_chunks > 1:
+            header_text = f"📚 New Relevant Papers ({chunk_index}/{total_chunks})"
+        elif total_papers and total_papers != len(papers_with_translations):
             header_text = (
-                f"{len(papers_with_translations)} of {total_papers} New Relevant Papers "
-                f"(size limit reached)"
+                f"📚 {len(papers_with_translations)} of {total_papers} New Relevant Papers"
             )
         else:
-            header_text = f"{len(papers_with_translations)} New Relevant Papers"
+            header_text = f"📚 {len(papers_with_translations)} New Relevant Papers"
 
         # Build card body
         body: list[dict[str, Any]] = [

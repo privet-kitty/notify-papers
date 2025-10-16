@@ -312,7 +312,9 @@ class TeamsNotifier:
         # Determine header text
         if chunk_index and total_chunks and total_chunks > 1:
             # Multiple chunks: show chunk number and total papers
-            header_text = f"📚 {total_papers} New Relevant Papers (Part {chunk_index}/{total_chunks})"
+            header_text = (
+                f"📚 {total_papers} New Relevant Papers (Part {chunk_index}/{total_chunks})"
+            )
         elif total_papers and total_papers != len(papers_with_translations):
             # Single chunk but not all papers (shouldn't happen with current logic)
             header_text = (

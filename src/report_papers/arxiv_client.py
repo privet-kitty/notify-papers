@@ -111,7 +111,7 @@ class ArxivClient:
             end_date_dt = datetime.combine(end_date, datetime.min.time())
         start_date = end_date_dt - timedelta(days=days_back)
 
-        date_range = f"[{start_date.strftime('%Y%m%d')}* TO {end_date_dt.strftime('%Y%m%d')}*]"
+        date_range = f"[{start_date.strftime('%Y%m%d0000')} TO {end_date_dt.strftime('%Y%m%d2359')}]"
 
         # Base query with date filter
         query_parts = [f"({query})", f"submittedDate:{date_range}"]

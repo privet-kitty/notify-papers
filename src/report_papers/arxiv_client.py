@@ -146,22 +146,17 @@ class ArxivClient:
         papers_dict: dict[str, Paper] = {}
 
         for topic in topics:
-            try:
-                papers = self.search_papers(
-                    query=topic,
-                    max_results=max_results_per_topic,
-                    days_back=days_back,
-                    categories=categories,
-                    end_date=end_date,
-                )
+            papers = self.search_papers(
+                query=topic,
+                max_results=max_results_per_topic,
+                days_back=days_back,
+                categories=categories,
+                end_date=end_date,
+            )
 
-                # Use dict for automatic deduplication by paper ID
-                for paper in papers:
-                    papers_dict[paper.id] = paper
-
-            except Exception as e:
-                logger.error(f"Error searching for topic '{topic}': {e}")
-                continue
+            # Use dict for automatic deduplication by paper ID
+            for paper in papers:
+                papers_dict[paper.id] = paper
 
         # Sort by publication date (newest first)
         all_papers = sorted(papers_dict.values(), key=lambda p: p.published, reverse=True)

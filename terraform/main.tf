@@ -1,4 +1,6 @@
 
+data "aws_caller_identity" "current" {}
+
 # S3 Bucket for duplicate detection
 resource "aws_s3_bucket" "papers_bucket" {
   bucket = "${var.project_name}-papers-${random_id.bucket_suffix.hex}"
@@ -90,9 +92,15 @@ resource "aws_iam_role_policy" "lambda_policy" {
         Action = [
           "bedrock:InvokeModel"
         ]
-        Resource = [
-          "arn:aws:bedrock:*::foundation-model/${var.llm_model}"
-        ]
+        Resource = concat(
+          [
+            "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:inference-profile/${var.llm_model}",
+          ],
+          [
+            for r in ["us-east-1", "us-east-2", "us-west-2"] :
+            "arn:aws:bedrock:${r}::foundation-model/${replace(var.llm_model, "/^[a-z]+\\./", "")}"
+          ],
+        )
       },
       {
         Effect = "Allow"

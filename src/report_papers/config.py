@@ -65,7 +65,7 @@ def get_environment_config() -> AgentConfig:
             "electricity market",
             "energy market",
         ],
-        "llm_model": "anthropic.claude-3-haiku-20240307-v1:0",
+        "llm_model": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
         "aws_bedrock_region": "us-east-1",
         "max_results_per_topic": 40,
         "days_back": 3,

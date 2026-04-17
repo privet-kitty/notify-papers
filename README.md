@@ -34,7 +34,7 @@ Before deploying this system, ensure you have the following tools installed:
 
 Also, ensure you have the following prerequisites:
 
-- Enable Claude models in Amazon Bedrock before deployment. Please go to your [Amazon Bedrock Console](https://console.aws.amazon.com/bedrock/) and enable access to Claude models. The default model used is `anthropic.claude-3-haiku-20240307-v1:0`.
+- Enable Claude models in Amazon Bedrock before deployment. Please go to your [Amazon Bedrock Console](https://console.aws.amazon.com/bedrock/) and enable access to Claude models. The default model used is `us.anthropic.claude-haiku-4-5-20251001-v1:0` (a US cross-region inference profile for Claude Haiku 4.5).
 - If you use Teams notifications, set up an [Incoming Webhook](https://support.microsoft.com/en-us/office/create-incoming-webhooks-with-workflows-for-microsoft-teams-8ae491c7-0394-4861-ba59-055e33f75498) in your Teams channel and add the URL to `TEAMS_WEBHOOK_URL` in `terraform.tfvars`.
 - Copy the example configuration file and customize it:
 
@@ -70,7 +70,7 @@ Before trying this system, ensure you have the following tools installed:
 
 Also, ensure you have the following prerequisites:
 
-- Enable Claude models in Amazon Bedrock before deployment. Please go to your [Amazon Bedrock Console](https://console.aws.amazon.com/bedrock/) and enable access to Claude models. The default model used is `anthropic.claude-3-haiku-20240307-v1:0`.
+- Enable Claude models in Amazon Bedrock before deployment. Please go to your [Amazon Bedrock Console](https://console.aws.amazon.com/bedrock/) and enable access to Claude models. The default model used is `us.anthropic.claude-haiku-4-5-20251001-v1:0` (a US cross-region inference profile for Claude Haiku 4.5).
 
 ### Run API Locally
 

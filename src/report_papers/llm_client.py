@@ -28,25 +28,6 @@ class LLMClient:
         self.model = model
         self.bedrock_runtime = boto3.client("bedrock-runtime", region_name=region)
 
-        # Supported Bedrock models
-        self.supported_models = {
-            "anthropic.claude-3-haiku-20240307-v1:0",
-            "anthropic.claude-3-sonnet-20240229-v1:0",
-            "anthropic.claude-3-opus-20240229-v1:0",
-            "anthropic.claude-v2:1",
-            "anthropic.claude-v2",
-            "anthropic.claude-instant-v1",
-        }
-
-        if model not in self.supported_models:
-            logger.warning(
-                f"Model {model} may not be supported. Supported models: {self.supported_models}"
-            )
-
-    def _is_claude_v3_model(self) -> bool:
-        """Check if the model is Claude v3 (uses different API format)."""
-        return "claude-3" in self.model
-
     def evaluate_paper_relevance(
         self, paper: Paper, research_topics: list[str], threshold: float
     ) -> PaperRelevance:
@@ -123,23 +104,12 @@ Respond only with the JSON object, no additional text.
     def _evaluate_with_bedrock(self, prompt: str) -> str:
         """Evaluate using Amazon Bedrock."""
         try:
-            if self._is_claude_v3_model():
-                # Claude v3 uses the Messages API format
-                body = {
-                    "anthropic_version": "bedrock-2023-05-31",
-                    "max_tokens": 500,
-                    "temperature": 0.1,
-                    "messages": [{"role": "user", "content": prompt}],
-                }
-            else:
-                # Claude v2 and older use the Text Completions format
-                body = {
-                    "prompt": f"\n\nHuman: You are a helpful research assistant specialized in energy and electricity market research.\n\n{prompt}\n\nAssistant:",
-                    "max_tokens_to_sample": 500,
-                    "temperature": 0.1,
-                    "top_p": 1,
-                    "stop_sequences": ["\n\nHuman:"],
-                }
+            body = {
+                "anthropic_version": "bedrock-2023-05-31",
+                "max_tokens": 500,
+                "temperature": 0.1,
+                "messages": [{"role": "user", "content": prompt}],
+            }
 
             response = self.bedrock_runtime.invoke_model(
                 modelId=self.model,
@@ -149,13 +119,7 @@ Respond only with the JSON object, no additional text.
             )
 
             response_body = json.loads(response["body"].read())
-
-            if self._is_claude_v3_model():
-                # Claude v3 response format
-                return str(response_body["content"][0]["text"])
-            else:
-                # Claude v2 response format
-                return str(response_body["completion"])
+            return str(response_body["content"][0]["text"])
 
         except ClientError as e:
             logger.error(f"Bedrock ClientError: {e}")

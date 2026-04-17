@@ -42,9 +42,9 @@ variable "arxiv_categories" {
 }
 
 variable "llm_model" {
-  description = "Amazon Bedrock LLM model to use for paper evaluation"
+  description = "Amazon Bedrock inference profile ID for paper evaluation (Claude 4.x models require an inference profile, not a bare foundation-model ID)."
   type        = string
-  default     = "anthropic.claude-3-haiku-20240307-v1:0"
+  default     = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 }
 
 variable "iam_permissions_boundary" {

@@ -44,13 +44,14 @@ class ArxivClient:
         self.session.headers.update(
             {"User-Agent": "report-papers/1.0 (https://github.com/user/report-papers)"}
         )
-        # Retry transient failures (read timeouts, 5xx). backoff_factor=3 yields
-        # waits of 3s, 6s, 12s — keeping per-request spacing above ArXiv's 3s
-        # rate limit even under retry.
+        # Retry transient failures (read timeouts, 5xx, 429). backoff_factor=3
+        # yields waits of 3s, 6s, 12s — keeping per-request spacing above ArXiv's
+        # 3s rate limit even under retry. urllib3 honors the Retry-After header
+        # for 429/503 automatically.
         retry = Retry(
             total=3,
             backoff_factor=3,
-            status_forcelist=(500, 502, 503, 504),
+            status_forcelist=(429, 500, 502, 503, 504),
             allowed_methods=frozenset(["GET"]),
             raise_on_status=False,
         )

@@ -1,15 +1,22 @@
 """ArXiv API client for paper search and retrieval."""
 
+import time
 from datetime import datetime, timedelta, date
 from typing import Any
 
 import feedparser
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from .interface import Paper
 from .logger import get_logger
 
 logger = get_logger(__name__)
+
+# ArXiv API Terms of Use require no more than one request every 3 seconds.
+# https://info.arxiv.org/help/api/tou.html
+ARXIV_REQUEST_INTERVAL_SECONDS = 3.0
 
 
 def parse_arxiv_entry(entry: dict[str, Any]) -> Paper:
@@ -30,12 +37,27 @@ class ArxivClient:
     """Client for interacting with ArXiv API."""
 
     BASE_URL = "http://export.arxiv.org/api/query"
+    REQUEST_TIMEOUT_SECONDS = 60
 
     def __init__(self) -> None:
         self.session = requests.Session()
         self.session.headers.update(
-            {"User-Agent": "report-papers/1.0 (https://github.com/user/report-papers)"}
+            {"User-Agent": "notify-papers/1.0 (+https://github.com/privet-kitty/notify-papers)"}
         )
+        # Retry transient failures (read timeouts, 5xx, 429). backoff_factor=3
+        # yields waits of 3s, 6s, 12s — keeping per-request spacing above ArXiv's
+        # 3s rate limit even under retry. urllib3 honors the Retry-After header
+        # for 429/503 automatically.
+        retry = Retry(
+            total=3,
+            backoff_factor=3,
+            status_forcelist=(429, 500, 502, 503, 504),
+            allowed_methods=frozenset(["GET"]),
+            raise_on_status=False,
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
 
     def search_papers(
         self,
@@ -72,7 +94,9 @@ class ArxivClient:
         logger.info(f"Searching ArXiv with query: {search_query}")
 
         try:
-            response = self.session.get(self.BASE_URL, params=params, timeout=30)
+            response = self.session.get(
+                self.BASE_URL, params=params, timeout=self.REQUEST_TIMEOUT_SECONDS
+            )
             response.raise_for_status()
 
             # Parse the Atom feed
@@ -111,7 +135,9 @@ class ArxivClient:
             end_date_dt = datetime.combine(end_date, datetime.min.time())
         start_date = end_date_dt - timedelta(days=days_back)
 
-        date_range = f"[{start_date.strftime('%Y%m%d0000')} TO {end_date_dt.strftime('%Y%m%d2359')}]"
+        date_range = (
+            f"[{start_date.strftime('%Y%m%d0000')} TO {end_date_dt.strftime('%Y%m%d2359')}]"
+        )
 
         # Base query with date filter
         query_parts = [f"({query})", f"submittedDate:{date_range}"]
@@ -145,7 +171,11 @@ class ArxivClient:
         """
         papers_dict: dict[str, Paper] = {}
 
-        for topic in topics:
+        for index, topic in enumerate(topics):
+            if index > 0:
+                # ArXiv Terms of Use: at most one request every 3 seconds.
+                time.sleep(ARXIV_REQUEST_INTERVAL_SECONDS)
+
             papers = self.search_papers(
                 query=topic,
                 max_results=max_results_per_topic,

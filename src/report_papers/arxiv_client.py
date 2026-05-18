@@ -42,7 +42,7 @@ class ArxivClient:
     def __init__(self) -> None:
         self.session = requests.Session()
         self.session.headers.update(
-            {"User-Agent": "report-papers/1.0 (https://github.com/user/report-papers)"}
+            {"User-Agent": "notify-papers/1.0 (+https://github.com/privet-kitty/notify-papers)"}
         )
         # Retry transient failures (read timeouts, 5xx, 429). backoff_factor=3
         # yields waits of 3s, 6s, 12s — keeping per-request spacing above ArXiv's

@@ -1,6 +1,10 @@
 
 data "aws_caller_identity" "current" {}
 
+locals {
+  bedrock_region = coalesce(var.aws_bedrock_region, var.aws_region)
+}
+
 # S3 Bucket for duplicate detection
 resource "aws_s3_bucket" "papers_bucket" {
   bucket = "${var.project_name}-papers-${random_id.bucket_suffix.hex}"
@@ -94,7 +98,7 @@ resource "aws_iam_role_policy" "lambda_policy" {
         ]
         Resource = concat(
           [
-            "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:inference-profile/${var.llm_model}",
+            "arn:aws:bedrock:${local.bedrock_region}:${data.aws_caller_identity.current.account_id}:inference-profile/${var.llm_model}",
           ],
           [
             for r in ["us-east-1", "us-east-2", "us-west-2"] :
@@ -131,7 +135,7 @@ resource "aws_lambda_function" "paper_agent" {
       TEAMS_WEBHOOK_URL         = var.teams_webhook_url
       RESEARCH_TOPICS           = join(",", var.research_topics)
       LLM_MODEL                 = var.llm_model
-      AWS_BEDROCK_REGION        = var.aws_region
+      AWS_BEDROCK_REGION        = local.bedrock_region
       TRANSLATE_TARGET_LANGUAGE = var.translate_target_language
       ARXIV_CATEGORIES          = join(",", var.arxiv_categories)
     }

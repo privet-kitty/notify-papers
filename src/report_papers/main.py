@@ -95,7 +95,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         logger.info(f"Processing {len(new_papers)} new papers")
 
         # Evaluate paper relevance using LLM
-        relevant_papers = llm_client.filter_relevant_papers(
+        relevant_papers, evaluated_paper_ids = llm_client.filter_relevant_papers(
             papers=new_papers,
             research_topics=config["research_topics"],
             threshold=config["relevance_threshold"],
@@ -104,9 +104,10 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
         logger.info(f"Found {len(relevant_papers)} relevant papers")
 
-        # Update seen papers list
-        new_paper_ids = [paper.id for paper in new_papers]
-        s3_storage.update_seen_papers(new_paper_ids)
+        # Only mark successfully evaluated papers as seen. Papers whose LLM
+        # evaluation failed are intentionally left out so they get retried on
+        # the next run instead of being silently dropped.
+        s3_storage.update_seen_papers(evaluated_paper_ids)
 
         # Send notifications if there are relevant papers
         if relevant_papers:

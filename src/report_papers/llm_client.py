@@ -41,31 +41,23 @@ class LLMClient:
 
         Returns:
             PaperRelevance object with evaluation results
+
+        Raises:
+            Exception: If Bedrock invocation or response parsing fails. Callers
+                must treat this as "not yet evaluated" so the paper is retried
+                on a later run rather than silently marked as not-relevant.
         """
         prompt = self._create_evaluation_prompt(paper, research_topics)
 
-        try:
-            result = self._evaluate_with_bedrock(prompt)
+        result = self._evaluate_with_bedrock(prompt)
+        relevance = self._parse_evaluation_result(result, threshold)
+        logger.info(
+            f"Evaluated paper {paper.id}: "
+            f"score={relevance.relevance_score:.2f}, "
+            f"relevant={relevance.is_relevant}"
+        )
 
-            # Parse the result
-            relevance = self._parse_evaluation_result(result, threshold)
-            logger.info(
-                f"Evaluated paper {paper.id}: "
-                f"score={relevance.relevance_score:.2f}, "
-                f"relevant={relevance.is_relevant}"
-            )
-
-            return relevance
-
-        except Exception as e:
-            logger.error(f"Error evaluating paper relevance: {e}")
-            # Return low relevance score on error
-            return PaperRelevance(
-                relevance_score=0.1,
-                relevance_reason="Error during evaluation",
-                key_topics=[],
-                is_relevant=False,
-            )
+        return relevance
 
     def _create_evaluation_prompt(self, paper: Paper, research_topics: list[str]) -> str:
         """Create prompt for paper relevance evaluation."""
@@ -129,44 +121,29 @@ Respond only with the JSON object, no additional text.
             raise
 
     def _parse_evaluation_result(self, result: str, threshold: float) -> PaperRelevance:
-        """Parse LLM evaluation result into PaperRelevance object."""
-        try:
-            # Clean up the result to extract JSON
-            result = result.strip()
-            if result.startswith("```json"):
-                result = result[7:]
-            if result.endswith("```"):
-                result = result[:-3]
+        """Parse LLM evaluation result into PaperRelevance object.
 
-            data = json.loads(result)
+        Raises on malformed responses so the caller can retry the paper on a
+        later run instead of trusting a fabricated score.
+        """
+        # Clean up the result to extract JSON
+        result = result.strip()
+        if result.startswith("```json"):
+            result = result[7:]
+        if result.endswith("```"):
+            result = result[:-3]
 
-            relevance_score = float(data.get("relevance_score", 0.0))
-            is_relevant = data.get("is_highly_relevant", relevance_score >= threshold)
+        data = json.loads(result)
 
-            return PaperRelevance(
-                relevance_score=relevance_score,
-                relevance_reason=data.get("relevance_reason", ""),
-                key_topics=data.get("key_topics", []),
-                is_relevant=is_relevant,
-            )
+        relevance_score = float(data["relevance_score"])
+        is_relevant = data.get("is_highly_relevant", relevance_score >= threshold)
 
-        except (json.JSONDecodeError, KeyError, ValueError) as e:
-            logger.error(f"Error parsing evaluation result: {e}")
-            logger.debug(f"Raw result: {result}")
-
-            # Fallback: try to extract score from text
-            score = 0.1
-            if "high" in result.lower() or "relevant" in result.lower():
-                score = 0.7
-            elif "moderate" in result.lower():
-                score = 0.5
-
-            return PaperRelevance(
-                relevance_score=score,
-                relevance_reason="Parsing error - fallback evaluation",
-                key_topics=[],
-                is_relevant=score >= threshold,
-            )
+        return PaperRelevance(
+            relevance_score=relevance_score,
+            relevance_reason=data.get("relevance_reason", ""),
+            key_topics=data.get("key_topics", []),
+            is_relevant=is_relevant,
+        )
 
     def evaluate_multiple_papers(
         self, papers: list[Paper], research_topics: list[str], threshold: float
@@ -174,13 +151,18 @@ Respond only with the JSON object, no additional text.
         """
         Evaluate multiple papers for relevance.
 
+        Papers whose evaluation fails (Bedrock error, malformed response, etc.)
+        are skipped — they are NOT included in the returned list so the caller
+        can avoid marking them as seen and retry them later.
+
         Args:
             papers: List of Paper objects
             research_topics: List of research topics
             threshold: Minimum relevance score
 
         Returns:
-            List of (paper, relevance) tuples, sorted by relevance score
+            List of (paper, relevance) tuples for successfully evaluated papers,
+            sorted by relevance score
         """
         results = []
 
@@ -189,14 +171,16 @@ Respond only with the JSON object, no additional text.
                 relevance = self.evaluate_paper_relevance(paper, research_topics, threshold)
                 results.append((paper, relevance))
             except Exception as e:
-                logger.error(f"Error evaluating paper {paper.id}: {e}")
+                logger.error(
+                    f"Skipping paper {paper.id} due to evaluation error (will retry later): {e}"
+                )
                 continue
 
         # Sort by relevance score (highest first)
         results.sort(key=lambda x: x[1].relevance_score, reverse=True)
 
         logger.info(
-            f"Evaluated {len(results)} papers, "
+            f"Evaluated {len(results)}/{len(papers)} papers successfully, "
             f"{sum(1 for _, r in results if r.is_relevant)} relevant"
         )
 
@@ -208,25 +192,30 @@ Respond only with the JSON object, no additional text.
         research_topics: list[str],
         threshold: float,
         max_papers: int,
-    ) -> list[tuple[Paper, PaperRelevance]]:
+    ) -> tuple[list[tuple[Paper, PaperRelevance]], list[str]]:
         """
-        Filter and return only relevant papers.
+        Filter and return only relevant papers, plus the IDs of all
+        successfully evaluated papers (relevant or not).
 
         Args:
             papers: List of Paper objects
             research_topics: List of research topics
             threshold: Minimum relevance score
-            max_papers: Maximum number of papers to return
+            max_papers: Maximum number of relevant papers to return
 
         Returns:
-            List of relevant (paper, relevance) tuples
+            Tuple of:
+              - List of relevant (paper, relevance) tuples (capped at max_papers)
+              - List of paper IDs that were successfully evaluated. Callers
+                should only mark these as seen; papers whose evaluation failed
+                are omitted so they get retried on the next run.
         """
         all_evaluations = self.evaluate_multiple_papers(papers, research_topics, threshold)
 
-        # Filter for relevant papers only
+        evaluated_paper_ids = [paper.id for paper, _ in all_evaluations]
+
         relevant_papers = [
             (paper, relevance) for paper, relevance in all_evaluations if relevance.is_relevant
         ]
 
-        # Return top N papers
-        return relevant_papers[:max_papers]
+        return relevant_papers[:max_papers], evaluated_paper_ids

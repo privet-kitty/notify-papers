@@ -1,5 +1,6 @@
 # Copy this file to terraform.tfvars and fill in your values
 aws_region = "us-east-1"
+# aws_bedrock_region = "us-west-2"  # Optional: override if Bedrock model is not available in aws_region
 project_name = "report-papers"
 email_recipient = "hugo@example.com"
 translate_target_language = "en"

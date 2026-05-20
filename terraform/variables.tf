@@ -1,8 +1,14 @@
 # Variables
 variable "aws_region" {
-  description = "AWS region"
+  description = "AWS region for infrastructure resources"
   type        = string
   default     = "us-east-1"
+}
+
+variable "aws_bedrock_region" {
+  description = "AWS region for Amazon Bedrock (defaults to aws_region if not set; set this when the desired Bedrock model/inference profile is not available in aws_region)."
+  type        = string
+  default     = null
 }
 
 variable "project_name" {

@@ -16,7 +16,14 @@ logger = get_logger(__name__)
 
 # ArXiv API Terms of Use require no more than one request every 3 seconds.
 # https://info.arxiv.org/help/api/tou.html
-ARXIV_REQUEST_INTERVAL_SECONDS = 3.0
+# We sleep longer than the minimum to stay friendly with ArXiv after observing
+# bursts of 429/503/timeout responses against AWS egress IPs.
+ARXIV_REQUEST_INTERVAL_SECONDS = 15.0
+
+# After a topic exhausts the inner urllib3 retries we wait this long before
+# trying that topic one more time, giving ArXiv room to recover from a
+# transient 429/503/timeout.
+ARXIV_TOPIC_FAILURE_COOLDOWN_SECONDS = 60.0
 
 
 def parse_arxiv_entry(entry: dict[str, Any]) -> Paper:
@@ -170,26 +177,64 @@ class ArxivClient:
             Deduplicated list of Paper objects
         """
         papers_dict: dict[str, Paper] = {}
+        failed_topics: list[str] = []
 
         for index, topic in enumerate(topics):
             if index > 0:
                 # ArXiv Terms of Use: at most one request every 3 seconds.
                 time.sleep(ARXIV_REQUEST_INTERVAL_SECONDS)
 
-            papers = self.search_papers(
-                query=topic,
-                max_results=max_results_per_topic,
-                days_back=days_back,
-                categories=categories,
-                end_date=end_date,
-            )
+            try:
+                papers = self.search_papers(
+                    query=topic,
+                    max_results=max_results_per_topic,
+                    days_back=days_back,
+                    categories=categories,
+                    end_date=end_date,
+                )
+            except requests.RequestException as e:
+                # Inner urllib3 Retry already burned its 3 attempts (3s/6s/12s
+                # backoff). Wait longer and try this topic once more before
+                # giving up, since ArXiv 429/503/timeout bursts often clear
+                # within a minute.
+                logger.warning(
+                    f"Topic '{topic}' failed after inner retries: {e}. "
+                    f"Sleeping {ARXIV_TOPIC_FAILURE_COOLDOWN_SECONDS}s and retrying once."
+                )
+                time.sleep(ARXIV_TOPIC_FAILURE_COOLDOWN_SECONDS)
+                try:
+                    papers = self.search_papers(
+                        query=topic,
+                        max_results=max_results_per_topic,
+                        days_back=days_back,
+                        categories=categories,
+                        end_date=end_date,
+                    )
+                except requests.RequestException as retry_err:
+                    logger.error(
+                        f"Topic '{topic}' failed again after cooldown: {retry_err}. "
+                        "Skipping this topic; remaining topics will still be processed."
+                    )
+                    failed_topics.append(topic)
+                    continue
 
             # Use dict for automatic deduplication by paper ID
             for paper in papers:
                 papers_dict[paper.id] = paper
 
+        if failed_topics and len(failed_topics) == len(topics):
+            raise RuntimeError(f"All ArXiv topic searches failed: {failed_topics}")
+        if failed_topics:
+            logger.warning(
+                f"Partial ArXiv failure: {len(failed_topics)}/{len(topics)} "
+                f"topic(s) failed and were skipped: {failed_topics}"
+            )
+
         # Sort by publication date (newest first)
         all_papers = sorted(papers_dict.values(), key=lambda p: p.published, reverse=True)
 
-        logger.info(f"Found {len(all_papers)} unique papers across {len(topics)} topics")
+        succeeded = len(topics) - len(failed_topics)
+        logger.info(
+            f"Found {len(all_papers)} unique papers across {succeeded}/{len(topics)} topics"
+        )
         return all_papers
